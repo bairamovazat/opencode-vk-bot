@@ -461,7 +461,7 @@ export const en = {
     "Enter OpenCode server password (optional).\nPress Enter to keep it empty.\n> ",
   "runtime.wizard.api_url_invalid": "Enter a valid URL (http/https) or press Enter for default.\n",
   "runtime.wizard.start": "OpenCode Telegram Bot setup.\n",
-  "runtime.wizard.saved": "Configuration saved:\n- {envPath}\n- {settingsPath}\n",
+  "runtime.wizard.saved": "Configuration saved:\n- {envPath}\n",
   "runtime.wizard.not_configured_starting":
     "Application is not configured yet. Starting wizard...\n",
   "runtime.wizard.tty_required":

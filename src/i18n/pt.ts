@@ -481,7 +481,7 @@ export const pt: I18nDictionary = {
   "runtime.wizard.api_url_invalid":
     "Digite uma URL válida (http/https) ou pressione Enter para usar o padrão.\n",
   "runtime.wizard.start": "Configuração do OpenCode Telegram Bot.\n",
-  "runtime.wizard.saved": "Configuração salva:\n- {envPath}\n- {settingsPath}\n",
+  "runtime.wizard.saved": "Configuração salva:\n- {envPath}\n",
   "runtime.wizard.not_configured_starting":
     "O aplicativo ainda não foi configurado. Iniciando o assistente...\n",
   "runtime.wizard.tty_required":

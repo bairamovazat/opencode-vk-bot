@@ -428,6 +428,16 @@ describe("app/stores/settings-store", () => {
       expect(await readFile(backupPath(), "utf-8")).toBe(corruptedBackup);
     });
 
+    it("refuses to start when settings.json is missing and its backup is unreadable", async () => {
+      const corruptedBackup = '{"compactOutputMode":';
+      await writeFile(backupPath(), corruptedBackup);
+
+      await expect(loadSettings()).rejects.toThrow(/settings\.json.*\.bak/s);
+
+      expect(await exists(settingsPath())).toBe(false);
+      expect(await readFile(backupPath(), "utf-8")).toBe(corruptedBackup);
+    });
+
     it("starts with empty settings when neither file exists", async () => {
       await expect(loadSettings()).resolves.toBeUndefined();
 

@@ -8,6 +8,7 @@ import {
   ensureRuntimeConfigForStart,
   validateRuntimeEnvValues,
 } from "../../src/runtime/bootstrap.js";
+import { t } from "../../src/i18n/index.js";
 import { setRuntimeMode } from "../../src/runtime/mode.js";
 
 const ENV_EXAMPLE_CONTENT = fs.readFileSync(path.resolve(process.cwd(), ".env.example"), "utf-8");
@@ -234,7 +235,7 @@ describe("runtime/bootstrap installed configuration", () => {
     await ensureRuntimeConfigForStart();
 
     expect(fs.existsSync(path.join(tempHome, ".env"))).toBe(false);
-    await expect(readFile(path.join(tempHome, "settings.json"), "utf-8")).resolves.toBe("{}\n");
+    expect(fs.existsSync(path.join(tempHome, "settings.json"))).toBe(false);
   });
 
   it("merges .env values with process.env taking precedence", async () => {
@@ -254,7 +255,7 @@ describe("runtime/bootstrap installed configuration", () => {
 
     await ensureRuntimeConfigForStart();
 
-    await expect(readFile(path.join(tempHome, "settings.json"), "utf-8")).resolves.toBe("{}\n");
+    expect(fs.existsSync(path.join(tempHome, "settings.json"))).toBe(false);
   });
 
   it("rejects an invalid process.env value even when .env is valid", async () => {
@@ -275,5 +276,34 @@ describe("runtime/bootstrap installed configuration", () => {
       "Interactive wizard requires a TTY terminal",
     );
     expect(fs.existsSync(path.join(tempHome, "settings.json"))).toBe(false);
+  });
+
+  it("does not create settings.json when a readable backup exists", async () => {
+    const backupPath = path.join(tempHome, "settings.json.bak");
+    const backupContent = JSON.stringify({ currentProject: "proj-1" });
+    await writeFile(backupPath, backupContent, "utf-8");
+
+    await ensureRuntimeConfigForStart();
+
+    expect(fs.existsSync(path.join(tempHome, "settings.json"))).toBe(false);
+    await expect(readFile(backupPath, "utf-8")).resolves.toBe(backupContent);
+  });
+
+  it("does not create settings.json when the backup is unreadable", async () => {
+    const backupPath = path.join(tempHome, "settings.json.bak");
+    const backupContent = '{"currentProject":';
+    await writeFile(backupPath, backupContent, "utf-8");
+
+    await ensureRuntimeConfigForStart();
+
+    expect(fs.existsSync(path.join(tempHome, "settings.json"))).toBe(false);
+    await expect(readFile(backupPath, "utf-8")).resolves.toBe(backupContent);
+  });
+
+  it("wizard saved copy names the env file and not settings.json", () => {
+    const message = t("runtime.wizard.saved", { envPath: path.join(tempHome, ".env") });
+
+    expect(message).toContain(path.join(tempHome, ".env"));
+    expect(message).not.toMatch(/settings\.json/);
   });
 });

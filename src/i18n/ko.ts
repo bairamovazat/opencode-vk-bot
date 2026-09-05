@@ -471,7 +471,7 @@ export const ko: I18nDictionary = {
   "runtime.wizard.api_url_invalid":
     "유효한 URL(http/https)을 입력하거나 Enter를 눌러 기본값을 사용하세요.\n",
   "runtime.wizard.start": "OpenCode Telegram Bot 설정을 시작합니다.\n",
-  "runtime.wizard.saved": "설정이 저장되었습니다:\n- {envPath}\n- {settingsPath}\n",
+  "runtime.wizard.saved": "설정이 저장되었습니다:\n- {envPath}\n",
   "runtime.wizard.not_configured_starting":
     "아직 구성되지 않았습니다. 설정 마법사를 시작합니다...\n",
   "runtime.wizard.tty_required":

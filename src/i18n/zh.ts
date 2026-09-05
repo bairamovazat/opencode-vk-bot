@@ -425,7 +425,7 @@ export const zh: I18nDictionary = {
     "请输入 OpenCode 服务器密码（可选）。\n按 Enter 保持为空。\n> ",
   "runtime.wizard.api_url_invalid": "请输入有效 URL（http/https），或按 Enter 使用默认值。\n",
   "runtime.wizard.start": "OpenCode Telegram Bot 设置。\n",
-  "runtime.wizard.saved": "配置已保存：\n- {envPath}\n- {settingsPath}\n",
+  "runtime.wizard.saved": "配置已保存：\n- {envPath}\n",
   "runtime.wizard.not_configured_starting": "应用尚未配置。正在启动向导...\n",
   "runtime.wizard.tty_required":
     "交互式向导需要 TTY 终端。请在交互式 shell 中运行 `opencode-telegram config`。",
