@@ -6,6 +6,7 @@ export interface TelegramPhotoInput {
   fileId: string;
   filename: string;
   source: TelegramPhotoSource;
+  fileSize?: number;
 }
 
 export interface IncomingPrompt {

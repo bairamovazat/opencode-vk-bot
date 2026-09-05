@@ -229,7 +229,15 @@ describe("bot/rich-message-routing", () => {
       richUpdate([
         {
           type: "photo",
-          photo: [{ file_id: "photo-1", file_unique_id: "p", width: 100, height: 100 }],
+          photo: [
+            {
+              file_id: "photo-1",
+              file_unique_id: "p",
+              width: 100,
+              height: 100,
+              file_size: 512,
+            },
+          ],
         },
       ]),
     );
@@ -254,7 +262,15 @@ describe("bot/rich-message-routing", () => {
       richUpdate([
         {
           type: "photo",
-          photo: [{ file_id: "photo-1", file_unique_id: "p", width: 100, height: 100 }],
+          photo: [
+            {
+              file_id: "photo-1",
+              file_unique_id: "p",
+              width: 100,
+              height: 100,
+              file_size: 512,
+            },
+          ],
         },
       ]),
     );
@@ -263,6 +279,7 @@ describe("bot/rich-message-routing", () => {
       expect.objectContaining({
         text: "",
         photos: [expect.objectContaining({ fileId: "photo-1", source: "rich" })],
+        mediaBytes: 512,
       }),
     ]);
     expect(mocked.queuePromptForMerging).not.toHaveBeenCalled();

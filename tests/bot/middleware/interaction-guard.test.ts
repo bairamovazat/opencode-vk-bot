@@ -4,8 +4,11 @@ import { interactionGuardMiddleware } from "../../../src/bot/middleware/interact
 import { interactionManager } from "../../../src/app/managers/interaction-manager.js";
 import { foregroundSessionState } from "../../../src/app/managers/foreground-session-state-manager.js";
 import { t } from "../../../src/i18n/index.js";
-import { promptQueue } from "../../../src/app/managers/prompt-queue-manager.js";
-import { MAX_QUEUED_PROMPTS } from "../../../src/app/managers/prompt-queue-manager.js";
+import {
+  MAX_QUEUED_MEDIA_BYTES,
+  MAX_QUEUED_PROMPTS,
+  promptQueue,
+} from "../../../src/app/managers/prompt-queue-manager.js";
 import { createIncomingPrompt } from "../../../src/app/types/prompt.js";
 import { setIncomingPrompt } from "../../../src/bot/handlers/rich-message-handler.js";
 import * as settingsStore from "../../../src/app/stores/settings-store.js";
@@ -15,9 +18,13 @@ const mocked = vi.hoisted(() => ({
   getPromptQueueEnabled: vi.fn(),
 }));
 
-vi.mock("../../../src/app/services/run-control-service.js", () => ({
-  reconcileForegroundBusyState: mocked.reconcileForegroundBusyStateMock,
-}));
+vi.mock("../../../src/app/services/run-control-service.js", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../../src/app/services/run-control-service.js")>();
+  return {
+    ...actual,
+    reconcileForegroundBusyState: mocked.reconcileForegroundBusyStateMock,
+  };
+});
 
 vi.mock("../../../src/app/stores/settings-store.js", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../../../src/app/stores/settings-store.js")>();
@@ -442,7 +449,7 @@ describe("interactionGuardMiddleware", () => {
     setIncomingPrompt(
       ctx,
       createIncomingPrompt("", {
-        photos: [{ fileId: "photo-1", filename: "rich.jpg", source: "rich" }],
+        photos: [{ fileId: "photo-1", filename: "rich.jpg", source: "rich", fileSize: 512 }],
       }),
     );
     const next: NextFunction = vi.fn().mockResolvedValue(undefined);
@@ -453,11 +460,64 @@ describe("interactionGuardMiddleware", () => {
     expect(promptQueue.list()).toEqual([
       expect.objectContaining({
         text: "",
-        photos: [{ fileId: "photo-1", filename: "rich.jpg", source: "rich" }],
+        photos: [{ fileId: "photo-1", filename: "rich.jpg", source: "rich", fileSize: 512 }],
+        mediaBytes: 512,
       }),
     ]);
     expect(ctx.reply).toHaveBeenCalledWith(
       t("queue.added", { count: "1", max: String(MAX_QUEUED_PROMPTS) }),
+      expect.anything(),
+    );
+  });
+
+  it("rejects a rich photo prompt with an unknown media size while busy", async () => {
+    mocked.getPromptQueueEnabled.mockReturnValue(true);
+    foregroundSessionState.markBusy("session-1", "D:\\Projects\\Repo");
+    const ctx = createTextContext("");
+    setIncomingPrompt(
+      ctx,
+      createIncomingPrompt("", {
+        photos: [{ fileId: "photo-1", filename: "rich.jpg", source: "rich" }],
+      }),
+    );
+    const next: NextFunction = vi.fn().mockResolvedValue(undefined);
+
+    await interactionGuardMiddleware(ctx, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(promptQueue.size()).toBe(0);
+    expect(ctx.reply).toHaveBeenCalledWith(
+      t("queue.media_limit", { maxSizeMb: "20" }),
+      expect.anything(),
+    );
+  });
+
+  it("rejects a rich photo aggregate above the media limit while busy", async () => {
+    mocked.getPromptQueueEnabled.mockReturnValue(true);
+    foregroundSessionState.markBusy("session-1", "D:\\Projects\\Repo");
+    const ctx = createTextContext("");
+    setIncomingPrompt(
+      ctx,
+      createIncomingPrompt("", {
+        photos: [
+          {
+            fileId: "photo-1",
+            filename: "first.jpg",
+            source: "rich",
+            fileSize: MAX_QUEUED_MEDIA_BYTES,
+          },
+          { fileId: "photo-2", filename: "second.jpg", source: "rich", fileSize: 1 },
+        ],
+      }),
+    );
+    const next: NextFunction = vi.fn().mockResolvedValue(undefined);
+
+    await interactionGuardMiddleware(ctx, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(promptQueue.mediaSize()).toBe(0);
+    expect(ctx.reply).toHaveBeenCalledWith(
+      t("queue.media_limit", { maxSizeMb: "20" }),
       expect.anything(),
     );
   });

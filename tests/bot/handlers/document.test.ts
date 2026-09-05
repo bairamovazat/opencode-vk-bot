@@ -160,6 +160,24 @@ describe("bot/handlers/document", () => {
   });
 
   describe("text files", () => {
+    it("reserves raw source bytes when a text file is queued", async () => {
+      vi.spyOn(settingsStore, "getPromptQueueEnabled").mockReturnValue(true);
+      foregroundSessionState.markBusy("session-1", "/repo");
+      const { ctx } = createDocumentContext();
+      const { deps, downloadMock, processPromptMock } = createDocumentDeps();
+
+      await handleDocumentMessage(ctx, deps);
+
+      expect(downloadMock).toHaveBeenCalledOnce();
+      expect(processPromptMock).not.toHaveBeenCalled();
+      expect(promptQueue.list()).toEqual([
+        expect.objectContaining({
+          mediaBytes: 1024,
+        }),
+      ]);
+      expect(promptQueue.mediaSize()).toBe(1024);
+    });
+
     it("downloads and sends text file content as prompt", async () => {
       const { ctx, replyMock } = createDocumentContext();
       const { deps, processPromptMock, downloadMock } = createDocumentDeps();

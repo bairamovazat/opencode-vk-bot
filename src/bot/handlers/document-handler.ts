@@ -100,7 +100,7 @@ export async function handleDocumentMessage(
         `[Document] Sending text file (${downloadedFile.buffer.length} bytes, ${filename}) as prompt`,
       );
 
-      await submitPrompt(promptWithFile);
+      await submitPrompt(promptWithFile, [], doc.file_size);
       return;
     }
 

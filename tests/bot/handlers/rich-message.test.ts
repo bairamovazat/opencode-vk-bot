@@ -13,7 +13,7 @@ function photoBlock(fileId: string): RichBlock {
     type: "photo",
     photo: [
       { file_id: `${fileId}-small`, file_unique_id: "small", width: 320, height: 240 },
-      { file_id: fileId, file_unique_id: "large", width: 1280, height: 960 },
+      { file_id: fileId, file_unique_id: "large", width: 1280, height: 960, file_size: 2048 },
     ],
   };
 }
@@ -119,6 +119,7 @@ describe("bot/handlers/rich-message-handler", () => {
         fileId: "photo-1",
         filename: "rich-photo-42-1.jpg",
         source: "rich",
+        fileSize: 2048,
       },
     ]);
     expect(result.skippedMediaCount).toBe(5);

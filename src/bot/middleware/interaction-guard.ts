@@ -4,6 +4,7 @@ import type { BlockReason, InteractionKind } from "../../app/types/interaction.j
 import { reconcileForegroundBusyState } from "../../app/services/run-control-service.js";
 import {
   canQueueMediaPrompt,
+  rejectQueuedMediaBeforePreparation,
   shouldSuggestPromptQueue,
   tryEnqueuePrompt,
 } from "../handlers/prompt-queue-dispatch.js";
@@ -91,6 +92,29 @@ function getInteractionBlockedMessage(
   }
 }
 
+function getQueuedPhotoMediaBytes(input: ReturnType<typeof getIncomingPrompt>): number | undefined {
+  if (!input?.photos.length) {
+    return 0;
+  }
+
+  let mediaBytes = 0;
+  for (const photo of input.photos) {
+    if (
+      typeof photo.fileSize !== "number" ||
+      !Number.isSafeInteger(photo.fileSize) ||
+      photo.fileSize < 0
+    ) {
+      return undefined;
+    }
+    mediaBytes += photo.fileSize;
+    if (!Number.isSafeInteger(mediaBytes)) {
+      return undefined;
+    }
+  }
+
+  return mediaBytes;
+}
+
 export async function interactionGuardMiddleware(
   ctx: Context,
   next: NextFunction,
@@ -119,7 +143,16 @@ export async function interactionGuardMiddleware(
   );
 
   if (isQueueableInput && incomingPrompt) {
-    const queued = await tryEnqueuePrompt(ctx, incomingPrompt);
+    const mediaBytes = getQueuedPhotoMediaBytes(incomingPrompt);
+    if (incomingPrompt.photos.length > 0) {
+      if (await rejectQueuedMediaBeforePreparation(ctx, mediaBytes)) {
+        return;
+      }
+    }
+    const queued = await tryEnqueuePrompt(
+      ctx,
+      mediaBytes === undefined ? incomingPrompt : { ...incomingPrompt, mediaBytes },
+    );
     if (queued) {
       return;
     }

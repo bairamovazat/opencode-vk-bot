@@ -166,6 +166,7 @@ function renderBlock(block: RichBlock, state: ConversionState): string {
           fileId: largestPhoto.file_id,
           filename: `rich-photo-${state.messageId}-${state.photos.length + 1}.jpg`,
           source: "rich",
+          ...(largestPhoto.file_size === undefined ? {} : { fileSize: largestPhoto.file_size }),
         });
       }
       return block.caption ? renderCaption(block.caption) : "";

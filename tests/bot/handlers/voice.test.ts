@@ -195,6 +195,7 @@ describe("bot/handlers/voice-handler", () => {
         responseMode: "text_only",
       }),
     ]);
+    expect(promptQueue.mediaSize()).toBe(0);
   });
 
   it("continues with prompt processing when recognized text message edit fails", async () => {

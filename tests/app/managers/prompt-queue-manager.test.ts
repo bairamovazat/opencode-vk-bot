@@ -61,6 +61,18 @@ describe("app/managers/prompt-queue-manager", () => {
     expect(promptQueue.size()).toBe(1);
   });
 
+  it("releases raw media bytes when an item is removed", () => {
+    const queued = promptQueue.add({
+      ...prompt("photo"),
+      mediaBytes: MAX_QUEUED_MEDIA_BYTES - 1,
+    });
+
+    promptQueue.removeById(queued!.id);
+
+    expect(promptQueue.mediaSize()).toBe(0);
+    expect(promptQueue.canAcceptMedia(MAX_QUEUED_MEDIA_BYTES)).toBe(true);
+  });
+
   it("takes prompts in FIFO order", () => {
     promptQueue.add(prompt("first"));
     promptQueue.add(prompt("second"));
