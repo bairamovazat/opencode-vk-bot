@@ -21,7 +21,7 @@ import { t } from "../../i18n/index.js";
 import type { VkMessage } from "../types.js";
 import type { VkSender } from "../send.js";
 import type { VkRunCollector } from "../run-collector.js";
-import { handleAbortIfRequested } from "../commands/abort.js";
+import { handleCommandIfRequested } from "../commands/router.js";
 
 const PROJECT_AUTO_SELECT_LOG = "[VkBot] No project selected: auto-selecting the first project";
 
@@ -32,7 +32,7 @@ export interface VkMessageHandlerDeps {
   /** Called after the backend accepted the prompt (US2 status start). */
   onRunStarted?: (sessionId: string, directory: string) => void;
   /** Called when the owner aborted the current session. */
-  onAborted?: (sessionId: string) => void;
+  onAborted?: ((sessionId: string) => void) | undefined;
 }
 
 /**
@@ -46,12 +46,12 @@ export async function handleOwnerTextMessage(
 ): Promise<void> {
   const { sender, runCollector, peerId } = deps;
 
-  const abort = await handleAbortIfRequested(message.text, sender, peerId);
-  if (abort.handled) {
-    const active = getCurrentSession();
-    if (active) {
-      deps.onAborted?.(active.id);
-    }
+  const command = await handleCommandIfRequested(message, {
+    sender,
+    peerId,
+    onAborted: deps.onAborted,
+  });
+  if (command) {
     return;
   }
 

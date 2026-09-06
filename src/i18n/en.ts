@@ -667,6 +667,17 @@ export const en = {
   "vk.perm_rejected": "⛔ Denied: {tool}",
   "vk.q_answered": "✅ Answer delivered to the agent.",
   "vk.menu_outdated": "This menu is outdated. Ask again for a fresh one.",
+  "vk.help_header": "Available commands:",
+  "vk.new_cleared": "🆕 Session cleared. Your next message starts a new task.",
+  "vk.status_report": "Project: {project}\nSession: {session}\nModel: {model}\nState: {state}",
+  "vk.sessions_empty": "No saved sessions yet.",
+  "vk.sessions_header": "Recent sessions — tap to resume:",
+  "vk.session_resumed": "✅ Session resumed: {title}",
+  "vk.rename_usage": "Usage: /rename <new title>",
+  "vk.rename_done": "✅ Renamed: {title}",
+  "vk.rename_no_session": "No active session to rename.",
+  "vk.status_state_idle": "Idle",
+  "vk.status_state_busy": "Busy (running a task)",
 } as const;
 
 export type I18nKey = keyof typeof en;

@@ -1,4 +1,5 @@
 import { isRecord } from "../utils/type-guards.js";
+import { vkClient } from "./client-instance.js";
 import { logger } from "../utils/logger.js";
 import { t } from "../i18n/index.js";
 import { opencodeClient } from "../opencode/client.js";
@@ -36,11 +37,16 @@ export interface QuestionMenuData {
   answers: Array<string[]>;
 }
 
-type MenuData = PermissionMenuData | QuestionMenuData;
+export interface SessionsMenuData {
+  kind: "sess";
+  sessions: Array<{ id: string; title: string; directory: string }>;
+}
+
+type MenuData = PermissionMenuData | QuestionMenuData | SessionsMenuData;
 
 export interface MenuDeps {
   /** VK API client used only for the button spinner answer. */
-  client: VkApiClient;
+  client?: VkApiClient;
   sender: VkSender;
 }
 
@@ -153,11 +159,11 @@ export async function buildQuestionMenu(
   const id = createMenuId();
   const menu: QuestionMenuData = { kind: "q", ...data, currentIndex: 0, answers: [] };
   menus.set(id, menu);
-  await showQuestion(deps, peerId, id, menu);
+  await showQuestion(deps.sender, peerId, id, menu);
 }
 
 async function showQuestion(
-  deps: MenuDeps,
+  sender: VkSender,
   peerId: number,
   id: string,
   menu: QuestionMenuData,
@@ -177,11 +183,11 @@ async function showQuestion(
     },
   ]);
   const keyboard = { inline: true, buttons: rows };
-  await sendKeyboard(deps, peerId, `❓ ${question.header || question.question}`, keyboard, menu);
+  await sendKeyboard({ sender }, peerId, `❓ ${question.header || question.question}`, keyboard, menu);
 }
 
 async function sendKeyboard(
-  deps: MenuDeps,
+  deps: { sender: VkSender },
   peerId: number,
   text: string,
   keyboard: unknown,
@@ -199,47 +205,101 @@ async function sendKeyboard(
   await deps.sender.sendText(peerId, text, { keyboard });
 }
 
+export async function buildSessionsMenu(
+  deps: MenuDeps,
+  peerId: number,
+  sessions: SessionsMenuData["sessions"],
+): Promise<void> {
+  const id = createMenuId();
+  const menu: SessionsMenuData = { kind: "sess", sessions };
+  menus.set(id, menu);
+
+  const rows = sessions.slice(0, MAX_BUTTONS).map((session): VkButton[] => [
+    {
+      action: {
+        type: "callback",
+        label: session.title.slice(0, 40),
+        payload: packPayload({ v: PAYLOAD_VERSION, k: "sess", s: id, a: "pick", x: sessions.indexOf(session) }),
+      },
+    },
+  ]);
+  const keyboard = { inline: true, buttons: rows };
+  const json = JSON.stringify(keyboard);
+  if (Buffer.byteLength(json, "utf8") > MAX_KEYBOARD_BYTES) {
+    logger.warn("[VkMenus] sessions keyboard too large, falling back to text");
+    await deps.sender.sendText(peerId, t("vk.sessions_header"));
+    return;
+  }
+  await deps.sender.sendText(peerId, t("vk.sessions_header"), { keyboard });
+}
+
 /**
  * Routes a button tap (US3): resolves the menu state, clears the spinner,
  * applies the action and replies. Stale/unknown taps never crash — they
  * answer politely once (router rules, contracts/callback-payloads.md).
  */
 export async function handleMenuButton(deps: MenuDeps, event: NormalizedButtonEvent): Promise<void> {
+  const client = deps.client ?? vkClient;
   const payload = unpackPayload(event.payload);
   if (!payload) {
-    await sendMessageEventAnswer(deps.client, event);
+    await sendMessageEventAnswer(client, event);
     return;
   }
 
   const menu = menus.get(payload.s);
   if (!menu) {
-    await sendMessageEventAnswer(deps.client, event);
+    await sendMessageEventAnswer(client, event);
     await deps.sender.sendText(event.peerId, t("vk.menu_outdated"));
     return;
   }
 
   if (menu.kind === "prm" && payload.k === "prm" && payload.a === "pick") {
-    await resolvePermission(deps, event, payload.s, menu, payload.x ?? 0);
+    await resolvePermission(client, deps.sender, event, payload.s, menu, payload.x ?? 0);
     return;
   }
 
   if (menu.kind === "q" && payload.k === "q" && payload.a === "pick") {
-    await pickQuestionOption(deps, event, payload.s, menu, payload.x ?? 0);
+    await pickQuestionOption(client, deps.sender, event, payload.s, menu, payload.x ?? 0);
     return;
   }
 
-  await sendMessageEventAnswer(deps.client, event);
+  if (menu.kind === "sess" && payload.k === "sess" && payload.a === "pick") {
+    await pickSession(client, deps.sender, event, payload.s, menu, payload.x ?? 0);
+    return;
+  }
+
+  await sendMessageEventAnswer(client, event);
+}
+
+async function pickSession(
+  client: VkApiClient,
+  sender: VkSender,
+  event: NormalizedButtonEvent,
+  id: string,
+  menu: SessionsMenuData,
+  index: number,
+): Promise<void> {
+  await sendMessageEventAnswer(client, event);
+  const session = menu.sessions[index];
+  if (!session) {
+    return;
+  }
+  resolveMenu(id);
+  const { setCurrentSession } = await import("../app/services/session-service.js");
+  setCurrentSession({ id: session.id, title: session.title, directory: session.directory });
+  await sender.sendText(event.peerId, t("vk.session_resumed", { title: session.title }));
 }
 
 async function resolvePermission(
-  deps: MenuDeps,
+  client: VkApiClient,
+  sender: VkSender,
   event: NormalizedButtonEvent,
   id: string,
   menu: PermissionMenuData,
   x: number,
 ): Promise<void> {
   const reply = x === 1 ? "once" : x === 2 ? "always" : "reject";
-  await sendMessageEventAnswer(deps.client, event);
+  await sendMessageEventAnswer(client, event);
   resolveMenu(id);
 
   try {
@@ -250,25 +310,31 @@ async function resolvePermission(
     });
     if (error) {
       logger.warn("[VkMenus] permission.reply error:", error);
-      await deps.sender.sendText(event.peerId, t("error.generic"));
+      await sender.sendText(event.peerId, t("error.generic"));
       return;
     }
-    const key = reply === "once" ? "vk.perm_allowed_once" : reply === "always" ? "vk.perm_allowed_always" : "vk.perm_rejected";
-    await deps.sender.sendText(event.peerId, t(key, { tool: menu.tool }));
+    const key =
+      reply === "once"
+        ? "vk.perm_allowed_once"
+        : reply === "always"
+          ? "vk.perm_allowed_always"
+          : "vk.perm_rejected";
+    await sender.sendText(event.peerId, t(key, { tool: menu.tool }));
   } catch (error) {
     logger.error("[VkMenus] permission.reply failed:", error);
-    await deps.sender.sendText(event.peerId, t("error.generic"));
+    await sender.sendText(event.peerId, t("error.generic"));
   }
 }
 
 async function pickQuestionOption(
-  deps: MenuDeps,
+  client: VkApiClient,
+  sender: VkSender,
   event: NormalizedButtonEvent,
   id: string,
   menu: QuestionMenuData,
   optionIndex: number,
 ): Promise<void> {
-  await sendMessageEventAnswer(deps.client, event);
+  await sendMessageEventAnswer(client, event);
 
   const question = menu.questions[menu.currentIndex];
   const option = question?.options[optionIndex];
@@ -280,7 +346,7 @@ async function pickQuestionOption(
 
   if (menu.currentIndex < menu.questions.length - 1) {
     menu.currentIndex += 1;
-    await showQuestion(deps, event.peerId, id, menu);
+    await showQuestion(sender, event.peerId, id, menu);
     return;
   }
 
@@ -293,12 +359,12 @@ async function pickQuestionOption(
     });
     if (error) {
       logger.warn("[VkMenus] question.reply error:", error);
-      await deps.sender.sendText(event.peerId, t("error.generic"));
+      await sender.sendText(event.peerId, t("error.generic"));
       return;
     }
-    await deps.sender.sendText(event.peerId, t("vk.q_answered"));
+    await sender.sendText(event.peerId, t("vk.q_answered"));
   } catch (error) {
     logger.error("[VkMenus] question.reply failed:", error);
-    await deps.sender.sendText(event.peerId, t("error.generic"));
+    await sender.sendText(event.peerId, t("error.generic"));
   }
 }

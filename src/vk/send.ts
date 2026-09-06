@@ -1,6 +1,6 @@
 import { randomInt } from "node:crypto";
 import { logger } from "../utils/logger.js";
-import { VkApiClient, type VkRequestParamValue } from "./client.js";
+import { VkApiClient, VkApiError, type VkRequestParamValue } from "./client.js";
 
 /**
  * VK rejects messages longer than 4096 characters; we stay under it to
@@ -12,6 +12,8 @@ export const VK_MESSAGE_SAFE_LIMIT = 4000;
 const CODE_FENCE = "```";
 /** VK flood control (identical messages in a row): retry once with a tweak. */
 const FLOOD_ERROR_CODE = 9;
+/** VK bot features disabled for keyboards (community setting). */
+const KEYBOARD_DISABLED_ERROR_CODE = 912;
 
 /**
  * Splits text into chunks within `limit`, preferring paragraph and then
@@ -148,12 +150,22 @@ export class VkSender {
       }
       return typeof response.message_id === "number" ? response.message_id : null;
     } catch (error) {
-      if (
-        error instanceof Error &&
-        error.name === "VkApiError" &&
-        "code" in error &&
-        (error as { code: number }).code === FLOOD_ERROR_CODE
-      ) {
+      const code = error instanceof VkApiError ? error.code : undefined;
+      // Keyboard rejected (bot features disabled in community settings):
+      // retry without buttons so the text is still delivered.
+      if (code === KEYBOARD_DISABLED_ERROR_CODE && params.keyboard !== undefined) {
+        logger.warn("[VkSender] Keyboard rejected (912), retrying without keyboard");
+        const plain = { ...params, keyboard: undefined };
+        const response = await this.client.call<number | { message_id?: number }>(
+          "messages.send",
+          plain,
+        );
+        if (typeof response === "number") {
+          return response;
+        }
+        return typeof response.message_id === "number" ? response.message_id : null;
+      }
+      if (code === FLOOD_ERROR_CODE) {
         logger.debug("[VkSender] Flood control, retrying with text variation");
         const varied = {
           ...params,
