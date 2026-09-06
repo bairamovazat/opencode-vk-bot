@@ -138,7 +138,14 @@ export class VkSender {
     params: Record<string, VkRequestParamValue>,
   ): Promise<number | null> {
     try {
-      const response = await this.client.call<{ message_id?: number }>("messages.send", params);
+      // VK returns either a bare number or {message_id} depending on context.
+      const response = await this.client.call<number | { message_id?: number }>(
+        "messages.send",
+        params,
+      );
+      if (typeof response === "number") {
+        return response;
+      }
       return typeof response.message_id === "number" ? response.message_id : null;
     } catch (error) {
       if (
@@ -152,7 +159,13 @@ export class VkSender {
           ...params,
           message: `${String(params.message ?? "")}\n\u200b`,
         };
-        const retry = await this.client.call<{ message_id?: number }>("messages.send", varied);
+        const retry = await this.client.call<number | { message_id?: number }>(
+          "messages.send",
+          varied,
+        );
+        if (typeof retry === "number") {
+          return retry;
+        }
         return typeof retry.message_id === "number" ? retry.message_id : null;
       }
       throw error;

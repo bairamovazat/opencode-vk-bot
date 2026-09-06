@@ -25,10 +25,11 @@ export class VkStatusRun {
 
   private messageId: number | null = null;
   private lastRenderedAt = 0;
-  private lastText = "";
   private pendingText: string | null = null;
   private refreshTimer: Promise<void> | null = null;
   private finished = false;
+  /** Serializes renders: concurrent send+delete pairs race otherwise. */
+  private chain: Promise<void> = Promise.resolve();
 
   constructor(options: VkStatusRunOptions) {
     this.client = options.client;
@@ -38,7 +39,16 @@ export class VkStatusRun {
   }
 
   async start(): Promise<void> {
-    await this.render(t("vk.status_running", { count: 0 }), true);
+    await this.enqueueRender(t("vk.status_running", { count: 0 }));
+  }
+
+  private enqueueRender(text: string): Promise<void> {
+    const run = this.chain.then(() => this.render(text));
+    this.chain = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
   }
 
   async setActivity(text: string): Promise<void> {
@@ -47,7 +57,7 @@ export class VkStatusRun {
     }
     const elapsed = this.now() - this.lastRenderedAt;
     if (elapsed >= MIN_UPDATE_INTERVAL_MS && this.refreshTimer === null) {
-      await this.render(text, false);
+      await this.enqueueRender(text);
       return;
     }
     this.pendingText = text;
@@ -58,7 +68,7 @@ export class VkStatusRun {
         const pending = this.pendingText;
         this.pendingText = null;
         if (pending !== null && !this.finished) {
-          await this.render(pending, false);
+          await this.enqueueRender(pending);
         }
       });
     }
@@ -70,6 +80,8 @@ export class VkStatusRun {
   async finish(): Promise<void> {
     this.finished = true;
     this.pendingText = null;
+    // Wait for any in-flight render so the freshest message id is removed.
+    await this.chain.catch(() => {});
     const messageId = this.messageId;
     this.messageId = null;
     if (messageId !== null) {
@@ -77,26 +89,40 @@ export class VkStatusRun {
     }
   }
 
-  private async render(text: string, immediate: boolean): Promise<void> {
-    if (immediate || text !== this.lastText) {
-      this.lastText = text;
+  private async render(text: string): Promise<void> {
+    if (this.finished) {
+      return;
     }
     const oldMessageId = this.messageId;
     let messageId: number | null = null;
     try {
-      const response = await this.client.call<{ message_id?: number }>("messages.send", {
-        peer_id: this.peerId,
-        message: text,
-        random_id: Math.floor(Math.random() * 2_147_483_647),
-        disable_notification: true,
-        dont_parse_links: true,
-      });
-      messageId = typeof response.message_id === "number" ? response.message_id : null;
+      // VK returns either a bare number or {message_id} depending on context.
+      const response = await this.client.call<number | { message_id?: number }>(
+        "messages.send",
+        {
+          peer_id: this.peerId,
+          message: text,
+          random_id: Math.floor(Math.random() * 2_147_483_647),
+          disable_notification: true,
+          dont_parse_links: true,
+        },
+      );
+      if (typeof response === "number") {
+        messageId = response;
+      } else if (typeof response.message_id === "number") {
+        messageId = response.message_id;
+      }
     } catch (error) {
       logger.warn("[VkStatus] Failed to send status message", error);
     }
     this.lastRenderedAt = this.now();
     if (messageId === null) {
+      return;
+    }
+    // The run may finish while the send is in flight: never resurrect the
+    // status after finish() cleaned up.
+    if (this.finished) {
+      await this.deleteMessage(messageId);
       return;
     }
     this.messageId = messageId;

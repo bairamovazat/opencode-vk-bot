@@ -31,6 +31,8 @@ export interface VkMessageHandlerDeps {
   peerId: number;
   /** Called after the backend accepted the prompt (US2 status start). */
   onRunStarted?: (sessionId: string) => void;
+  /** Called when the owner aborted the current session. */
+  onAborted?: (sessionId: string) => void;
 }
 
 /**
@@ -46,6 +48,10 @@ export async function handleOwnerTextMessage(
 
   const abort = await handleAbortIfRequested(message.text, sender, peerId);
   if (abort.handled) {
+    const active = getCurrentSession();
+    if (active) {
+      deps.onAborted?.(active.id);
+    }
     return;
   }
 

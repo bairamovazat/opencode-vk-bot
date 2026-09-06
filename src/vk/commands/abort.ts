@@ -10,6 +10,13 @@ export interface AbortOutcome {
   handled: boolean;
 }
 
+/** Sessions successfully aborted: registered so their follow-up error is suppressed. */
+const abortedSessionIds = new Set<string>();
+
+export function markSessionAborted(sessionId: string): void {
+  abortedSessionIds.add(sessionId);
+}
+
 /**
  * Minimal /abort / /stop handling for US2 (full command router arrives in
  * US4). Aborts the current session through the OpenCode API.
@@ -46,6 +53,7 @@ export async function handleAbortIfRequested(
     }
 
     logger.info(`[VkBot] Aborted session ${session.id}`);
+    markSessionAborted(session.id);
     await sender.sendText(peerId, t("vk.abort_done"));
   } catch (error) {
     logger.error("[VkBot] Abort failed:", error);

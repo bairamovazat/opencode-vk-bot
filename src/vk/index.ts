@@ -5,6 +5,7 @@ import { VkSender } from "./send.js";
 import { VkRunCollector, type RunResult, type ToolActivity } from "./run-collector.js";
 import { VkStatusRun } from "./status.js";
 import { handleOwnerTextMessage, type VkMessageHandlerDeps } from "./handlers/message-new.js";
+import { markSessionAborted } from "./commands/abort.js";
 import { renderMarkdownToPlainText } from "./render/pipeline.js";
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
@@ -25,6 +26,8 @@ export class VkBot {
   private longPoll: VkLongPoll | null = null;
   private lastOwnerPeerId: number | null = null;
   private statusRun: VkStatusRun | null = null;
+  /** Sessions aborted by the owner: their session.error is expected noise. */
+  private abortedSessionIds = new Set<string>();
 
   constructor() {
     this.client = new VkApiClient();
@@ -74,6 +77,7 @@ export class VkBot {
         runCollector: this.runCollector,
         peerId: event.message.peer_id,
         onRunStarted: (sessionId) => this.startStatusRun(sessionId, event.message.peer_id),
+        onAborted: (sessionId) => markSessionAborted(sessionId),
       };
       await handleOwnerTextMessage(event.message, deps);
       return;
@@ -133,6 +137,10 @@ export class VkBot {
   private async deliverRunError(sessionId: string, message: string): Promise<void> {
     await this.statusRun?.finish();
     this.statusRun = null;
+    if (this.abortedSessionIds.delete(sessionId)) {
+      logger.info(`[VkBot] Session ${sessionId} finished after owner abort; error suppressed`);
+      return;
+    }
     const peerId = this.lastOwnerPeerId;
     logger.error("[VkBot] Delivering run error to dialog", { sessionId, message });
     if (peerId === null) {
