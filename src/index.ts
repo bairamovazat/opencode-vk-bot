@@ -30,8 +30,8 @@ async function main(): Promise<void> {
   const { initializeLogger } = await import("./utils/logger.js");
   await initializeLogger();
 
-  const { startBotApp } = await import("./app/bootstrap/start-bot-app.js");
-  await startBotApp();
+  const { startVkBotApp } = await import("./app/bootstrap/start-vk-bot-app.js");
+  await startVkBotApp();
 }
 
 void main().catch(async (error: unknown) => {
