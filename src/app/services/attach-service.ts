@@ -9,7 +9,7 @@ import type { SessionInfo } from "../types/session.js";
 import { getCurrentSession } from "./session-service.js";
 import { getCurrentProject } from "../stores/settings-store.js";
 import { attachManager } from "../managers/attach-manager.js";
-import { resetStreamThrottle } from "../../bot/streaming/stream-throttle.js";
+import { resetStreamThrottle } from "../../utils/stream-throttle.js";
 import { logger } from "../../utils/logger.js";
 import { isExpectedOpencodeUnavailableError } from "../../utils/opencode-error.js";
 

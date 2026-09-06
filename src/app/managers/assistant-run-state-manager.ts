@@ -1,4 +1,4 @@
-import { resetAllStreamThrottles, resetStreamThrottle } from "../../bot/streaming/stream-throttle.js";
+import { resetAllStreamThrottles, resetStreamThrottle } from "../../utils/stream-throttle.js";
 import { logger } from "../../utils/logger.js";
 
 export interface AssistantRunStartInfo {

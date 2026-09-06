@@ -201,8 +201,42 @@ export function buildTelegramConfig(): {
   };
 }
 
+export function buildVkConfig(): {
+  groupToken: string;
+  groupId: number;
+  allowedUserId: number;
+  apiVersion: string;
+  longPollWaitSec: number;
+  maxAttachmentMb: number;
+} {
+  const groupId = parseInt(getEnvVar("VK_GROUP_ID"), 10);
+  if (Number.isNaN(groupId) || groupId <= 0) {
+    throw new Error("VK_GROUP_ID must be a positive integer (community id without the minus sign).");
+  }
+
+  const allowedUserId = parseInt(getEnvVar("VK_ALLOWED_USER_ID"), 10);
+  if (Number.isNaN(allowedUserId) || allowedUserId <= 0) {
+    throw new Error("VK_ALLOWED_USER_ID must be a positive integer (owner's VK user id).");
+  }
+
+  // Bots Long Poll holds the request open server-side; values outside the
+  // documented 5..90 range fall back to the default instead of failing startup.
+  const longPollWaitSecRaw = getOptionalPositiveIntEnvVar("VK_LONG_POLL_WAIT_SEC", 25);
+  const longPollWaitSec = Math.min(90, Math.max(5, longPollWaitSecRaw));
+
+  return {
+    groupToken: getEnvVar("VK_GROUP_TOKEN"),
+    groupId,
+    allowedUserId,
+    apiVersion: getEnvVar("VK_API_VERSION", false) || "5.199",
+    longPollWaitSec,
+    maxAttachmentMb: getOptionalPositiveIntEnvVar("VK_MAX_ATTACHMENT_MB", 45),
+  };
+}
+
 export const config = {
   telegram: buildTelegramConfig(),
+  vk: buildVkConfig(),
   opencode: {
     apiUrl: getEnvVar("OPENCODE_API_URL", false) || "http://localhost:4096",
     username: getEnvVar("OPENCODE_SERVER_USERNAME", false) || "opencode",
