@@ -46,3 +46,38 @@ message; unit tests cover transcript and unconfigured branches.
 Still pending (tasks.md): US2 status/abort, US3 buttons, US4–US7, cleanup
 phases (Telegram layer removal, metadata, secrets gate), T048 locale
 default, T049/T050 full manual pass and final gates.
+
+## 2026-09-06 (later) — Autonomous session results
+
+Live-verified end-to-end (all through the SELFTEST harness, no owner needed):
+
+- text prompt → agent → clean final reply (no user echo, no reasoning text)
+- live status messages (silent, throttled ≥3 s) removed cleanly at run end
+- /abort stops the run; the follow-up session.error is suppressed for the
+  owner (aborted-registry)
+- /status, /sessions, /new, /help, /start, /projects, /models all answered
+  in Russian; /sessions lists sessions as text while keyboards are rejected
+
+Defects fixed in this session:
+
+- concurrent status renders raced (deleted same old message, leaked new
+  ones) → renders serialized through a chain; finish awaits it
+- messages.send returns a bare number in dialogs → both status and sender
+  now accept number | {message_id}
+- owner-abort follow-up error suppressed via aborted-session registry
+- keyboard rejection (VK error 912) now falls back to text automatically
+
+Blocked-for-owner (needs community settings, see message sent to the dialog):
+
+- inline keyboards require «Возможности ботов» enabled: Управление →
+  Сообщения → Настройки → Возможности ботов. Until then menus fall back to
+  text lists; callbacks cannot fire without buttons anyway.
+
+Deferred (documented, not silently dropped):
+
+- T045 Telegram layer removal: src/bot deletion cascades grammy-typed
+  signatures in 5 shared files (aggregator, attach-service, file-download,
+  project-switch, scheduled-task-runtime) — a dedicated coordinated phase;
+  grammy stays installed meanwhile.
+- T043 outgoing diff/file delivery; T049 full manual pass needs the owner.
+- Live voice test (US8) awaits an owner voice message; logic unit-tested.
