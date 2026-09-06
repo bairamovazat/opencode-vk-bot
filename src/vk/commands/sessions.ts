@@ -30,5 +30,9 @@ export async function handleSessionsCommand(sender: VkSender, peerId: number): P
   }));
 
   logger.info(`[VkBot] /sessions: ${sessions.length} session(s) for ${project.worktree}`);
-  await buildSessionsMenu({ client: vkClient, sender }, peerId, sessions);
+  const textFallback =
+    t("vk.sessions_header") +
+    "\n" +
+    sessions.map((session, index) => `${index + 1}. ${session.title}`).join("\n");
+  await buildSessionsMenu({ client: vkClient, sender }, peerId, sessions, textFallback);
 }

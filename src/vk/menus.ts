@@ -209,6 +209,7 @@ export async function buildSessionsMenu(
   deps: MenuDeps,
   peerId: number,
   sessions: SessionsMenuData["sessions"],
+  textFallback?: string,
 ): Promise<void> {
   const id = createMenuId();
   const menu: SessionsMenuData = { kind: "sess", sessions };
@@ -227,10 +228,13 @@ export async function buildSessionsMenu(
   const json = JSON.stringify(keyboard);
   if (Buffer.byteLength(json, "utf8") > MAX_KEYBOARD_BYTES) {
     logger.warn("[VkMenus] sessions keyboard too large, falling back to text");
-    await deps.sender.sendText(peerId, t("vk.sessions_header"));
+    await deps.sender.sendText(peerId, textFallback ?? t("vk.sessions_header"));
     return;
   }
-  await deps.sender.sendText(peerId, t("vk.sessions_header"), { keyboard });
+  await deps.sender.sendText(peerId, t("vk.sessions_header"), {
+    keyboard,
+    fallbackText: textFallback,
+  });
 }
 
 /**

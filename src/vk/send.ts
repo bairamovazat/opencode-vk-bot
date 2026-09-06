@@ -83,6 +83,8 @@ export function chunkMessageText(text: string, limit: number = VK_MESSAGE_SAFE_L
 export interface SendTextOptions {
   silent?: boolean;
   keyboard?: unknown;
+  /** Text used when the keyboard is rejected (VK error 912). */
+  fallbackText?: string | undefined;
   attachment?: string;
 }
 
@@ -122,6 +124,9 @@ export class VkSender {
       }
       if (options.keyboard) {
         params.keyboard = JSON.stringify(options.keyboard);
+        if (options.fallbackText) {
+          params.fallbackMessage = options.fallbackText;
+        }
       }
       if (options.attachment) {
         params.attachment = options.attachment;
@@ -155,7 +160,12 @@ export class VkSender {
       // retry without buttons so the text is still delivered.
       if (code === KEYBOARD_DISABLED_ERROR_CODE && params.keyboard !== undefined) {
         logger.warn("[VkSender] Keyboard rejected (912), retrying without keyboard");
-        const plain = { ...params, keyboard: undefined };
+        const fallbackMessage = params.fallbackMessage;
+        const plain: Record<string, VkRequestParamValue> = { ...params };
+        delete plain.keyboard;
+        if (typeof fallbackMessage === "string" && fallbackMessage.length > 0) {
+          plain.message = fallbackMessage;
+        }
         const response = await this.client.call<number | { message_id?: number }>(
           "messages.send",
           plain,
