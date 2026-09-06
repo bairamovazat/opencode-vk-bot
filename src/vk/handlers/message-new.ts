@@ -1,4 +1,5 @@
 import type { FilePartInput, TextPartInput } from "@opencode-ai/sdk/v2";
+import { config } from "../../config.js";
 import { opencodeClient } from "../../opencode/client.js";
 import {
   clearSession,
@@ -58,18 +59,28 @@ export async function handleOwnerTextMessage(
   const hasVoice = (message.attachments ?? []).some(
     (attachment) => attachment.type === "audio_message",
   );
-  if (message.text.trim().length === 0 && !hasVoice) {
+  const hasFiles = (message.attachments ?? []).some(
+    (attachment) => attachment.type === "photo" || attachment.type === "doc",
+  );
+  if (message.text.trim().length === 0 && !hasVoice && !hasFiles) {
     return;
   }
 
   try {
+    const files = (await collectFileAttachments(message, sender, peerId)) ?? [];
     const speech = await resolveVoiceInput(message, sender, peerId);
     if (speech === null) {
       return;
     }
     const promptText = [message.text.trim(), speech].filter((part) => part.length > 0).join("\n");
-    if (promptText.length === 0) {
+    if (promptText.length === 0 && files.length === 0) {
       return;
+    }
+    if (promptText.length === 0 && files.length > 0) {
+      files.unshift({
+        type: "text",
+        text: files.length === 1 ? "See attached file" : "See attached files",
+      });
     }
 
     const project = await ensureProjectSelected(sender, peerId);
@@ -115,7 +126,11 @@ export async function handleOwnerTextMessage(
 
     const currentAgent = await resolveProjectAgent(getStoredAgent());
     const storedModel = getStoredModel();
-    const parts: Array<TextPartInput | FilePartInput> = [{ type: "text", text: promptText }];
+    const parts: Array<TextPartInput | FilePartInput> = [];
+    if (promptText.length > 0) {
+      parts.push({ type: "text", text: promptText });
+    }
+    parts.push(...files);
 
     logger.info(
       `[VkBot] Dispatching promptAsync session=${session.id} agent=${currentAgent ?? "default"}`,
@@ -187,6 +202,94 @@ async function ensureProjectSelected(
 
   setCurrentProject(first);
   return first;
+}
+
+function toDataUri(buffer: Buffer, mime: string): string {
+  return `data:${mime};base64,${buffer.toString("base64")}`;
+}
+
+/**
+ * Downloads photo/document attachments into prompt file parts (US7).
+ * Returns null when the whole prompt must be aborted (attachment failure
+ * without any text to send).
+ */
+async function collectFileAttachments(
+  message: VkMessage,
+  sender: VkSender,
+  peerId: number,
+): Promise<Array<TextPartInput | FilePartInput> | null> {
+  const attachments = message.attachments ?? [];
+  const maxBytes = config.vk.maxAttachmentMb * 1024 * 1024;
+  const parts: FilePartInput[] = [];
+  let failed = 0;
+
+  for (const attachment of attachments) {
+    try {
+      if (attachment.type === "photo" && isRecord(attachment.photo)) {
+        const sizes = attachment.photo.sizes;
+        const best = Array.isArray(sizes) ? sizes.at(-1) : undefined;
+        const url = isRecord(best) && typeof best.url === "string" ? best.url : null;
+        if (!url) {
+          continue;
+        }
+        const buffer = await downloadLimited(url, maxBytes);
+        if (!buffer) {
+          failed += 1;
+          continue;
+        }
+        parts.push({
+          type: "file",
+          mime: "image/jpeg",
+          filename: "photo.jpg",
+          url: toDataUri(buffer, "image/jpeg"),
+        });
+      } else if (attachment.type === "doc" && isRecord(attachment.doc)) {
+        const url = typeof attachment.doc.url === "string" ? attachment.doc.url : null;
+        const title = typeof attachment.doc.title === "string" ? attachment.doc.title : "document";
+        const ext = typeof attachment.doc.ext === "string" ? attachment.doc.ext : "bin";
+        if (!url) {
+          continue;
+        }
+        const buffer = await downloadLimited(url, maxBytes);
+        if (!buffer) {
+          failed += 1;
+          continue;
+        }
+        parts.push({
+          type: "file",
+          mime: "application/octet-stream",
+          filename: title.endsWith(`.${ext}`) ? title : `${title}.${ext}`,
+          url: toDataUri(buffer, "application/octet-stream"),
+        });
+      }
+    } catch (error) {
+      logger.warn("[VkBot] Attachment download failed:", error);
+      failed += 1;
+    }
+  }
+
+  if (failed > 0) {
+    await sender.sendText(peerId, t("vk.attachment_failed", { count: failed }));
+  }
+
+  if (parts.length === 0 && failed > 0 && message.text.trim().length === 0) {
+    return null;
+  }
+  return parts;
+}
+
+async function downloadLimited(url: string, maxBytes: number): Promise<Buffer | null> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    logger.warn("[VkBot] Attachment download HTTP error", { status: response.status });
+    return null;
+  }
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (buffer.byteLength > maxBytes) {
+    logger.warn("[VkBot] Attachment exceeds size cap", { bytes: buffer.byteLength });
+    return null;
+  }
+  return buffer;
 }
 
 /**

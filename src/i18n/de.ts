@@ -713,4 +713,5 @@ export const de: I18nDictionary = {
   "vk.models_header": "Modelle — antippen zum Wechseln:",
   "vk.model_switched": "✅ Modell gewechselt: {model}",
   "vk.models_empty": "Keine Modelle verfügbar.",
+  "vk.attachment_failed": "⚠️ {count} Anhang/-änge konnten nicht geladen werden.",
 };

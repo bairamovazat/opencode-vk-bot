@@ -693,4 +693,5 @@ export const ko: I18nDictionary = {
   "vk.models_header": "모델 — 탭하여 전환:",
   "vk.model_switched": "✅ 모델 전환됨: {model}",
   "vk.models_empty": "사용 가능한 모델이 없습니다.",
+  "vk.attachment_failed": "⚠️ 첨부파일 {count}개를 다운로드하지 못했습니다.",
 };

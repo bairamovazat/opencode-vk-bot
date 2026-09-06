@@ -693,4 +693,5 @@ export const ru: I18nDictionary = {
   "vk.models_header": "Модели — нажми, чтобы переключить:",
   "vk.model_switched": "✅ Модель переключена: {model}",
   "vk.models_empty": "Доступных моделей нет.",
+  "vk.attachment_failed": "⚠️ Не удалось скачать вложений: {count}.",
 };

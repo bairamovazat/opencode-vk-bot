@@ -699,4 +699,5 @@ export const it: I18nDictionary = {
   "vk.models_header": "Modelli: tocca per cambiare:",
   "vk.model_switched": "✅ Modello cambiato: {model}",
   "vk.models_empty": "Nessun modello disponibile.",
+  "vk.attachment_failed": "⚠️ Impossibile scaricare {count} allegato/i.",
 };

@@ -712,4 +712,5 @@ export const fr: I18nDictionary = {
   "vk.models_header": "Modèles — touchez pour changer :",
   "vk.model_switched": "✅ Modèle changé : {model}",
   "vk.models_empty": "Aucun modèle disponible.",
+  "vk.attachment_failed": "⚠️ Échec du téléchargement de {count} pièce(s) jointe(s).",
 };
