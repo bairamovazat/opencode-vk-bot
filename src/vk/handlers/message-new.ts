@@ -21,6 +21,7 @@ import { t } from "../../i18n/index.js";
 import type { VkMessage } from "../types.js";
 import type { VkSender } from "../send.js";
 import type { VkRunCollector } from "../run-collector.js";
+import { handleAbortIfRequested } from "../commands/abort.js";
 
 const PROJECT_AUTO_SELECT_LOG = "[VkBot] No project selected: auto-selecting the first project";
 
@@ -28,6 +29,8 @@ export interface VkMessageHandlerDeps {
   sender: VkSender;
   runCollector: VkRunCollector;
   peerId: number;
+  /** Called after the backend accepted the prompt (US2 status start). */
+  onRunStarted?: (sessionId: string) => void;
 }
 
 /**
@@ -40,6 +43,11 @@ export async function handleOwnerTextMessage(
   deps: VkMessageHandlerDeps,
 ): Promise<void> {
   const { sender, runCollector, peerId } = deps;
+
+  const abort = await handleAbortIfRequested(message.text, sender, peerId);
+  if (abort.handled) {
+    return;
+  }
 
   const hasVoice = (message.attachments ?? []).some(
     (attachment) => attachment.type === "audio_message",
@@ -135,6 +143,7 @@ export async function handleOwnerTextMessage(
           return;
         }
         logger.info("[VkBot] session.promptAsync accepted");
+        deps.onRunStarted?.(session.id);
       },
       onError: (error) => {
         foregroundSessionState.markIdle(session.id);

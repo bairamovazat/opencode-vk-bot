@@ -609,4 +609,8 @@ export const zh: I18nDictionary = {
   "vk.voice_not_configured": "🎙 未配置语音输入。请启用 VK 语音转写或设置 STT_API_URL/STT_API_KEY。",
   "vk.voice_transcribing": "🎙 正在转写语音消息…",
   "vk.voice_transcribe_error": "🎙 语音消息转写失败。",
+  "vk.status_running": "⏳ 智能体工作中…（工具操作：{count}）",
+  "vk.abort_done": "⏹ 任务已停止。",
+  "vk.abort_no_session": "没有正在运行的任务可停止。",
+  "vk.abort_failed": "停止任务失败。",
 };

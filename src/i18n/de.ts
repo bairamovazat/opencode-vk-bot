@@ -687,4 +687,8 @@ export const de: I18nDictionary = {
   "vk.voice_not_configured": "🎙 Spracheingabe ist nicht konfiguriert. Aktiviere VK-Sprachtranskripte oder setze STT_API_URL/STT_API_KEY.",
   "vk.voice_transcribing": "🎙 Sprachnachricht wird transkribiert…",
   "vk.voice_transcribe_error": "🎙 Sprachnachricht konnte nicht transkribiert werden.",
+  "vk.status_running": "⏳ Agent arbeitet… (Tool-Aktionen: {count})",
+  "vk.abort_done": "⏹ Aufgabe gestoppt.",
+  "vk.abort_no_session": "Keine laufende Aufgabe zum Stoppen.",
+  "vk.abort_failed": "Aufgabe konnte nicht gestoppt werden.",
 };

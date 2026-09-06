@@ -673,4 +673,8 @@ export const it: I18nDictionary = {
   "vk.voice_not_configured": "🎙 Input vocale non configurato. Attiva le trascrizioni VK o imposta STT_API_URL/STT_API_KEY.",
   "vk.voice_transcribing": "🎙 Trascrizione del messaggio vocale…",
   "vk.voice_transcribe_error": "🎙 Impossibile trascrivere il messaggio vocale.",
+  "vk.status_running": "⏳ L’agente sta lavorando… (azioni: {count})",
+  "vk.abort_done": "⏹ Attività interrotta.",
+  "vk.abort_no_session": "Nessuna attività in corso da interrompere.",
+  "vk.abort_failed": "Impossibile interrompere l’attività.",
 };

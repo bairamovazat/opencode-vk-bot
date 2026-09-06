@@ -667,4 +667,8 @@ export const ru: I18nDictionary = {
   "vk.voice_not_configured": "🎙 Голосовой ввод не настроен. Включите расшифровку голосовых в сообществе VK или задайте STT_API_URL/STT_API_KEY.",
   "vk.voice_transcribing": "🎙 Расшифровываю голосовое сообщение…",
   "vk.voice_transcribe_error": "🎙 Не удалось расшифровать голосовое сообщение.",
+  "vk.status_running": "⏳ Агент работает… (действий: {count})",
+  "vk.abort_done": "⏹ Задача остановлена.",
+  "vk.abort_no_session": "Нет запущенной задачи.",
+  "vk.abort_failed": "Не удалось остановить задачу.",
 };

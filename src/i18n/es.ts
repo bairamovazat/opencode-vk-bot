@@ -685,4 +685,8 @@ export const es: I18nDictionary = {
   "vk.voice_not_configured": "🎙 La entrada de voz no está configurada. Activa las transcripciones de VK o define STT_API_URL/STT_API_KEY.",
   "vk.voice_transcribing": "🎙 Transcribiendo el mensaje de voz…",
   "vk.voice_transcribe_error": "🎙 No se pudo transcribir el mensaje de voz.",
+  "vk.status_running": "⏳ El agente está trabajando… (acciones: {count})",
+  "vk.abort_done": "⏹ Tarea detenida.",
+  "vk.abort_no_session": "No hay tarea en curso que detener.",
+  "vk.abort_failed": "No se pudo detener la tarea.",
 };

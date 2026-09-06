@@ -7,11 +7,18 @@ export interface RunResult {
   text: string;
 }
 
+export interface ToolActivity {
+  toolCount: number;
+  lastTool?: string;
+}
+
 export interface RunCollectorDeps {
   /** Called when the agent run finishes with the assembled assistant text. */
   onComplete: (result: RunResult) => void | Promise<void>;
   /** Called on run-level backend errors (session.error). */
   onError: (sessionId: string, message: string) => void | Promise<void>;
+  /** Called on tool activity while the run is in flight (US2 status). */
+  onActivity?: (activity: ToolActivity) => void | Promise<void>;
 }
 
 interface TextPartState {
@@ -40,6 +47,7 @@ interface RunState {
 export class VkRunCollector {
   private readonly deps: RunCollectorDeps;
   private run: RunState | null = null;
+  private toolCount = 0;
 
   constructor(deps: RunCollectorDeps) {
     this.deps = deps;
@@ -99,6 +107,15 @@ export class VkRunCollector {
     if (type === "message.part.updated") {
       const part = isRecord(properties.part) ? properties.part : null;
       if (!part || part.sessionID !== run.sessionId) {
+        return;
+      }
+      if (part.type === "tool") {
+        this.toolCount += 1;
+        const activity: ToolActivity = { toolCount: this.toolCount };
+        if (typeof part.tool === "string") {
+          activity.lastTool = part.tool;
+        }
+        void this.deps.onActivity?.(activity);
         return;
       }
       if (part.type !== "text" || part.synthetic === true) {
@@ -186,6 +203,7 @@ export class VkRunCollector {
       return;
     }
     this.run = null;
+    this.toolCount = 0;
 
     const ordered = [...run.parts.entries()]
       .filter(([key]) => {

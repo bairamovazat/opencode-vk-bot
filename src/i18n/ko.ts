@@ -667,4 +667,8 @@ export const ko: I18nDictionary = {
   "vk.voice_not_configured": "🎙 음성 입력이 구성되지 않았습니다. VK 음성 전사를 활성화하거나 STT_API_URL/STT_API_KEY를 설정하세요.",
   "vk.voice_transcribing": "🎙 음성 메시지를 전사하는 중…",
   "vk.voice_transcribe_error": "🎙 음성 메시지 전사에 실패했습니다.",
+  "vk.status_running": "⏳ 에이전트가 작업 중… (도구 동작: {count})",
+  "vk.abort_done": "⏹ 작업이 중지되었습니다.",
+  "vk.abort_no_session": "중지할 실행 중인 작업이 없습니다.",
+  "vk.abort_failed": "작업을 중지하지 못했습니다.",
 };

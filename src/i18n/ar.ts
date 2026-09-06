@@ -640,4 +640,8 @@ export const ar: I18nDictionary = {
   "vk.voice_not_configured": "🎙 إدخال الصوت غير مهيأ. فعّل نصوص VK الصوتية أو عيّن STT_API_URL/STT_API_KEY.",
   "vk.voice_transcribing": "🎙 جارٍ تفريغ الرسالة الصوتية…",
   "vk.voice_transcribe_error": "🎙 تعذّر تفريغ الرسالة الصوتية.",
+  "vk.status_running": "⏳ الوكيل يعمل… (إجراءات الأدوات: {count})",
+  "vk.abort_done": "⏹ توقفت المهمة.",
+  "vk.abort_no_session": "لا توجد مهمة قيد التشغيل لإيقافها.",
+  "vk.abort_failed": "تعذّر إيقاف المهمة.",
 };

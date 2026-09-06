@@ -657,6 +657,10 @@ export const en = {
   "vk.voice_not_configured": "🎙 Voice input is not configured. Enable VK voice transcripts for the community or set STT_API_URL/STT_API_KEY.",
   "vk.voice_transcribing": "🎙 Transcribing the voice message…",
   "vk.voice_transcribe_error": "🎙 Failed to transcribe the voice message.",
+  "vk.status_running": "⏳ Agent is working… (tool actions: {count})",
+  "vk.abort_done": "⏹ Task stopped.",
+  "vk.abort_no_session": "No running task to stop.",
+  "vk.abort_failed": "Failed to stop the task.",
 } as const;
 
 export type I18nKey = keyof typeof en;
