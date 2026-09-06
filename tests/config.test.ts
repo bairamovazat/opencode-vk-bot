@@ -167,11 +167,12 @@ describe("config boolean env parsing", () => {
   });
 
   it("falls back to default locale on unsupported value", async () => {
+    // VK fork default: Russian primary locale (see contracts/environment.md).
     vi.stubEnv("BOT_LOCALE", "xx");
 
     const config = await loadConfig();
 
-    expect(config.bot.locale).toBe("en");
+    expect(config.bot.locale).toBe("ru");
   });
 
   it("uses default task limit when TASK_LIMIT is missing", async () => {

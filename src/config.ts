@@ -294,7 +294,8 @@ export const config = {
       false,
     ),
     bashToolDisplayMaxLength: getOptionalPositiveIntEnvVar("BASH_TOOL_DISPLAY_MAX_LENGTH", 128),
-    locale: getOptionalLocaleEnvVar("BOT_LOCALE", "en"),
+    // Fork default: Russian primary locale (constitution-adjacent decision).
+    locale: getOptionalLocaleEnvVar("BOT_LOCALE", "ru"),
     trackBackgroundSessions: getOptionalBooleanEnvVar("TRACK_BACKGROUND_SESSIONS", true),
     messageFormatMode: getOptionalMessageFormatModeEnvVar("MESSAGE_FORMAT_MODE", "markdown"),
     // Buffer near-limit text for this window so Telegram-split chunks can be merged.
