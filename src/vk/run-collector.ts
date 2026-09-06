@@ -25,6 +25,10 @@ interface RunState {
   parts: Map<string, TextPartState>;
   partOrder: Map<string, number>;
   nextOrder: number;
+  /** messageID -> role, learned from message.updated events. */
+  messageRoles: Map<string, string>;
+  /** Part keys proven to be `text` via part.updated (delta events may omit type). */
+  knownTextParts: Set<string>;
 }
 
 /**
@@ -58,6 +62,8 @@ export class VkRunCollector {
       parts: new Map(),
       partOrder: new Map(),
       nextOrder: 0,
+      messageRoles: new Map(),
+      knownTextParts: new Set(),
     };
     subscribeToEvents(directory, (event) => this.processEvent(event)).catch((error) => {
       logger.error("[VkRunCollector] Event subscription failed", error);
@@ -80,6 +86,16 @@ export class VkRunCollector {
     const properties = isRecord(event.properties) ? event.properties : {};
     const type = event.type;
 
+    if (type === "message.updated") {
+      const info = isRecord(properties.info) ? properties.info : null;
+      const messageID = info && typeof info.id === "string" ? info.id : null;
+      const role = info && typeof info.role === "string" ? info.role : null;
+      if (messageID && role && run.sessionId === (info?.sessionID ?? run.sessionId)) {
+        run.messageRoles.set(messageID, role);
+      }
+      return;
+    }
+
     if (type === "message.part.updated") {
       const part = isRecord(properties.part) ? properties.part : null;
       if (!part || part.sessionID !== run.sessionId) {
@@ -90,6 +106,8 @@ export class VkRunCollector {
       }
       const partId = typeof part.id === "string" ? part.id : "text";
       const messageId = typeof part.messageID === "string" ? part.messageID : undefined;
+      const partKey = messageId ? `${messageId}:${partId}` : partId;
+      run.knownTextParts.add(partKey);
       const state = this.ensurePart(partId, messageId);
       if (typeof part.text === "string") {
         state.content = part.text;
@@ -108,15 +126,20 @@ export class VkRunCollector {
         return;
       }
       const partType = (part?.type as string | undefined) ?? properties.type;
-      if (partType !== undefined && partType !== "text") {
-        return;
-      }
       const messageID = (part?.messageID as string | undefined) ?? properties.messageID;
       if (typeof messageID !== "string") {
         return;
       }
       const partID =
         (part?.id as string | undefined) ?? (properties.partID as string | undefined) ?? "text";
+      const partKey = `${messageID}:${partID}`;
+      // Delta events often omit the part type; accept them only for parts
+      // already proven to be text, so reasoning deltas never leak in.
+      if (partType === "text") {
+        run.knownTextParts.add(partKey);
+      } else if (partType !== undefined || !run.knownTextParts.has(partKey)) {
+        return;
+      }
       const delta = properties.delta;
       if (typeof delta !== "string" || delta.length === 0) {
         return;
@@ -164,7 +187,13 @@ export class VkRunCollector {
     }
     this.run = null;
 
-    const ordered = [...run.parts.entries()].sort((a, b) => a[1].order - b[1].order);
+    const ordered = [...run.parts.entries()]
+      .filter(([key]) => {
+        const [messageID] = key.split(":");
+        // User-message echoes must never leak into the assistant reply.
+        return run.messageRoles.get(messageID ?? "") !== "user";
+      })
+      .sort((a, b) => a[1].order - b[1].order);
     const text = ordered
       .map(([, state]) => state.content)
       .filter((content) => content.trim().length > 0)

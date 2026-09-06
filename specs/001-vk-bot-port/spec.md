@@ -274,6 +274,11 @@ arrives readable.
   agent is busy (owner-visible policy, never silent mixing).
 - **FR-017**: System MUST persist owner preferences (selected project,
   session, model) across restarts.
+- **FR-018**: System MUST accept voice messages as prompts, using the VK
+  transcript when available and a configured speech-to-text service
+  otherwise (FR-012 locale applies to all notices).
+- **FR-019**: System MUST reject voice input with a clear notice when
+  neither a transcript nor a speech-to-text service is available.
 
 ### Key Entities *(include if feature involves data)*
 
@@ -319,6 +324,29 @@ arrives readable.
   delivered complete: correct order, no truncation, no broken code
   blocks.
 
+---
+
+### User Story 8 - Talk to the agent with voice messages (Priority: P2)
+
+The owner records a voice message in VK. The bot transcribes it (VK's
+built-in transcript when present, otherwise a configured Whisper-compatible
+service) and sends the text to the agent as a prompt; the reply follows the
+usual text flow.
+
+**Why this priority**: the owner explicitly requested voice-first
+communication from the phone.
+
+**Independent Test**: send a voice message asking a known question; verify
+the agent answers its content.
+
+**Acceptance Scenarios**:
+
+1. **Given** a voice message with a VK-provided transcript, **When** it is
+   sent, **Then** the agent receives the transcribed text as the prompt.
+2. **Given** no VK transcript and no STT service configured, **When** a
+   voice message is sent, **Then** the owner receives a clear notice and no
+   prompt is dispatched.
+
 ## Assumptions
 
 - Single-owner deployment (matches the source project): exactly one
@@ -327,9 +355,9 @@ arrives readable.
   message dialogs are not targeted.
 - The end goal is feature parity with the source project; delivery is
   phased (P1 core loop → P2 control/management → P3 media/models).
-  Source-only extras (voice transcription, text-to-speech replies,
-  scheduled tasks, worktree management, prompt-queue editing) are
-  explicitly deferred and not required for first release.
+  Voice input was promoted to US8 by owner request (2026-09-06).
+  Source-only extras (text-to-speech replies, scheduled tasks, worktree
+  management, prompt-queue editing) remain explicitly deferred.
 - The OpenCode agent backend already exists on the owner's machine and
   is reused as-is; this feature adds no new backend capabilities.
 - Russian is the primary and initially only maintained locale; other

@@ -141,6 +141,16 @@ for selection UI. **Independent test**: quickstart scenario 7.
 
 ---
 
+## Phase 9b: User Story 8 — Voice messages (P2, added by owner request)
+
+**Depends on**: US1 flow. **Independent test**: quickstart voice scenario.
+
+- [ ] T051 [US8] Implement voice input resolution: VK audio_message transcript first, Whisper-compatible STT fallback (STT_API_URL), friendly notices (FR-018/019) in src/vk/handlers/message-new.ts
+- [ ] T052 [US8] Write voice handler tests: transcript prompt, unconfigured rejection in tests/vk/handlers/message-new.test.ts
+- [ ] T053 [US8] Add vk.voice_* i18n keys to all locales in src/i18n/*.ts
+
+---
+
 ## Phase 10: Polish & Cross-Cutting
 
 **Purpose**: complete the port as a standalone VK project (D3).
