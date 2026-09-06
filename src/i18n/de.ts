@@ -691,4 +691,10 @@ export const de: I18nDictionary = {
   "vk.abort_done": "⏹ Aufgabe gestoppt.",
   "vk.abort_no_session": "Keine laufende Aufgabe zum Stoppen.",
   "vk.abort_failed": "Aufgabe konnte nicht gestoppt werden.",
+  "vk.perm_asked": "🔐 Berechtigung erforderlich: {tool}",
+  "vk.perm_allowed_once": "✅ Einmal erlaubt: {tool}",
+  "vk.perm_allowed_always": "✅ Immer erlaubt: {tool}",
+  "vk.perm_rejected": "⛔ Verweigert: {tool}",
+  "vk.q_answered": "✅ Antwort an den Agenten übermittelt.",
+  "vk.menu_outdated": "Dieses Menü ist veraltet. Fordere es neu an.",
 };

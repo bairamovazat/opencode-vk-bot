@@ -671,4 +671,10 @@ export const ko: I18nDictionary = {
   "vk.abort_done": "⏹ 작업이 중지되었습니다.",
   "vk.abort_no_session": "중지할 실행 중인 작업이 없습니다.",
   "vk.abort_failed": "작업을 중지하지 못했습니다.",
+  "vk.perm_asked": "🔐 권한 필요: {tool}",
+  "vk.perm_allowed_once": "✅ 한 번 허용됨: {tool}",
+  "vk.perm_allowed_always": "✅ 항상 허용됨: {tool}",
+  "vk.perm_rejected": "⛔ 거부됨: {tool}",
+  "vk.q_answered": "✅ 에이전트에게 답변이 전달되었습니다.",
+  "vk.menu_outdated": "이 메뉴는 오래되었습니다. 다시 요청하세요.",
 };

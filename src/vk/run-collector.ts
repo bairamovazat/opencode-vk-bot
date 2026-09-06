@@ -12,6 +12,23 @@ export interface ToolActivity {
   lastTool?: string;
 }
 
+export interface PermissionAsked {
+  requestId: string;
+  sessionId: string;
+  permission: string;
+  patterns: string[];
+}
+
+export interface QuestionAsked {
+  requestId: string;
+  sessionId: string;
+  questions: Array<{
+    question: string;
+    header: string;
+    options: Array<{ label: string; description: string }>;
+  }>;
+}
+
 export interface RunCollectorDeps {
   /** Called when the agent run finishes with the assembled assistant text. */
   onComplete: (result: RunResult) => void | Promise<void>;
@@ -19,6 +36,10 @@ export interface RunCollectorDeps {
   onError: (sessionId: string, message: string) => void | Promise<void>;
   /** Called on tool activity while the run is in flight (US2 status). */
   onActivity?: (activity: ToolActivity) => void | Promise<void>;
+  /** Permission prompt from the agent (US3). */
+  onPermission?: (asked: PermissionAsked) => void | Promise<void>;
+  /** Question prompt from the agent (US3). */
+  onQuestion?: (asked: QuestionAsked) => void | Promise<void>;
 }
 
 interface TextPartState {
@@ -163,6 +184,48 @@ export class VkRunCollector {
       }
       const state = this.ensurePart(partID, messageID);
       state.content += delta;
+      return;
+    }
+
+    if (type === "permission.asked") {
+      const id = typeof properties.id === "string" ? properties.id : null;
+      const sessionID = typeof properties.sessionID === "string" ? properties.sessionID : null;
+      if (!id || sessionID !== run.sessionId) {
+        return;
+      }
+      const permission =
+        typeof properties.permission === "string" ? properties.permission : "unknown";
+      const patterns = Array.isArray(properties.patterns)
+        ? properties.patterns.filter((p): p is string => typeof p === "string")
+        : [];
+      void this.deps.onPermission?.({
+        requestId: id,
+        sessionId: sessionID,
+        permission,
+        patterns,
+      });
+      return;
+    }
+
+    if (type === "question.asked") {
+      const id = typeof properties.id === "string" ? properties.id : null;
+      const sessionID = typeof properties.sessionID === "string" ? properties.sessionID : null;
+      if (!id || sessionID !== run.sessionId) {
+        return;
+      }
+      const questions = Array.isArray(properties.questions)
+        ? properties.questions.filter(isRecord).map((q) => ({
+            question: typeof q.question === "string" ? q.question : "",
+            header: typeof q.header === "string" ? q.header : "",
+            options: Array.isArray(q.options)
+              ? q.options.filter(isRecord).map((o) => ({
+                  label: typeof o.label === "string" ? o.label : "",
+                  description: typeof o.description === "string" ? o.description : "",
+                }))
+              : [],
+          }))
+        : [];
+      void this.deps.onQuestion?.({ requestId: id, sessionId: sessionID, questions });
       return;
     }
 

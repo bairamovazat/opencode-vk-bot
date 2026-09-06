@@ -644,4 +644,10 @@ export const ar: I18nDictionary = {
   "vk.abort_done": "⏹ توقفت المهمة.",
   "vk.abort_no_session": "لا توجد مهمة قيد التشغيل لإيقافها.",
   "vk.abort_failed": "تعذّر إيقاف المهمة.",
+  "vk.perm_asked": "🔐 إذن مطلوب: {tool}",
+  "vk.perm_allowed_once": "✅ سُمح مرة واحدة: {tool}",
+  "vk.perm_allowed_always": "✅ سُمح دائمًا: {tool}",
+  "vk.perm_rejected": "⛔ رُفض: {tool}",
+  "vk.q_answered": "✅ تم إبلاغ الوكيل بالجواب.",
+  "vk.menu_outdated": "هذه القائمة قديمة. اطلبها من جديد.",
 };

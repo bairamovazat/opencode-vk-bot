@@ -677,4 +677,10 @@ export const it: I18nDictionary = {
   "vk.abort_done": "⏹ Attività interrotta.",
   "vk.abort_no_session": "Nessuna attività in corso da interrompere.",
   "vk.abort_failed": "Impossibile interrompere l’attività.",
+  "vk.perm_asked": "🔐 Permesso richiesto: {tool}",
+  "vk.perm_allowed_once": "✅ Consentito una volta: {tool}",
+  "vk.perm_allowed_always": "✅ Consentito sempre: {tool}",
+  "vk.perm_rejected": "⛔ Negato: {tool}",
+  "vk.q_answered": "✅ Risposta consegnata all’agente.",
+  "vk.menu_outdated": "Questo menu è obsoleto. Richiedilo di nuovo.",
 };

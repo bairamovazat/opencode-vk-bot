@@ -690,4 +690,10 @@ export const fr: I18nDictionary = {
   "vk.abort_done": "⏹ Tâche arrêtée.",
   "vk.abort_no_session": "Aucune tâche en cours à arrêter.",
   "vk.abort_failed": "Impossible d’arrêter la tâche.",
+  "vk.perm_asked": "🔐 Permission requise : {tool}",
+  "vk.perm_allowed_once": "✅ Autorisé une fois : {tool}",
+  "vk.perm_allowed_always": "✅ Toujours autorisé : {tool}",
+  "vk.perm_rejected": "⛔ Refusé : {tool}",
+  "vk.q_answered": "✅ Réponse transmise à l’agent.",
+  "vk.menu_outdated": "Ce menu est obsolète. Redemandez-le.",
 };

@@ -671,4 +671,10 @@ export const ru: I18nDictionary = {
   "vk.abort_done": "⏹ Задача остановлена.",
   "vk.abort_no_session": "Нет запущенной задачи.",
   "vk.abort_failed": "Не удалось остановить задачу.",
+  "vk.perm_asked": "🔐 Требуется разрешение: {tool}",
+  "vk.perm_allowed_once": "✅ Разрешено однократно: {tool}",
+  "vk.perm_allowed_always": "✅ Разрешено всегда: {tool}",
+  "vk.perm_rejected": "⛔ Запрещено: {tool}",
+  "vk.q_answered": "✅ Ответ передан агенту.",
+  "vk.menu_outdated": "Это меню устарело. Запросите заново.",
 };

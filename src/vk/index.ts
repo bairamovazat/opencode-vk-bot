@@ -2,7 +2,14 @@ import { VkApiClient } from "./client.js";
 import { VkEventNormalizer, type NormalizedEvent } from "./events.js";
 import { VkLongPoll } from "./longpoll.js";
 import { VkSender } from "./send.js";
-import { VkRunCollector, type RunResult, type ToolActivity } from "./run-collector.js";
+import {
+  VkRunCollector,
+  type RunResult,
+  type ToolActivity,
+  type PermissionAsked,
+  type QuestionAsked,
+} from "./run-collector.js";
+import { buildPermissionMenu, buildQuestionMenu } from "./menus.js";
 import { VkStatusRun } from "./status.js";
 import { handleOwnerTextMessage, type VkMessageHandlerDeps } from "./handlers/message-new.js";
 import { markSessionAborted } from "./commands/abort.js";
@@ -10,7 +17,7 @@ import { renderMarkdownToPlainText } from "./render/pipeline.js";
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
 import { t } from "../i18n/index.js";
-import { sendMessageEventAnswer } from "./callbacks.js";
+import { handleMenuButton } from "./menus.js";
 
 /**
  * VK transport composition root: long poll → normalization → handlers →
@@ -26,6 +33,7 @@ export class VkBot {
   private longPoll: VkLongPoll | null = null;
   private lastOwnerPeerId: number | null = null;
   private statusRun: VkStatusRun | null = null;
+  private currentDirectory: string | null = null;
   /** Sessions aborted by the owner: their session.error is expected noise. */
   private abortedSessionIds = new Set<string>();
 
@@ -41,6 +49,8 @@ export class VkBot {
       onComplete: (result) => this.deliverRunResult(result),
       onError: (sessionId, message) => this.deliverRunError(sessionId, message),
       onActivity: (activity) => this.reportActivity(activity),
+      onPermission: (asked) => this.showPermissionMenu(asked),
+      onQuestion: (asked) => this.showQuestionMenu(asked),
     });
   }
 
@@ -76,7 +86,10 @@ export class VkBot {
         sender: this.sender,
         runCollector: this.runCollector,
         peerId: event.message.peer_id,
-        onRunStarted: (sessionId) => this.startStatusRun(sessionId, event.message.peer_id),
+        onRunStarted: (sessionId, directory) => {
+          this.currentDirectory = directory;
+          this.startStatusRun(sessionId, event.message.peer_id);
+        },
         onAborted: (sessionId) => markSessionAborted(sessionId),
       };
       await handleOwnerTextMessage(event.message, deps);
@@ -91,18 +104,50 @@ export class VkBot {
    * client does not hang, and the tap is otherwise ignored.
    */
   private async handleButtonEvent(event: NormalizedEvent & { kind: "button" }): Promise<void> {
-    logger.debug("[VkBot] Button tap ignored (menus arrive with US3)", { eventId: event.eventId });
-    await sendMessageEventAnswer(this.client, {
-      eventId: event.eventId,
-      userId: event.userId,
-      peerId: event.peerId,
-    });
+    await handleMenuButton({ client: this.client, sender: this.sender }, event);
   }
 
   private startStatusRun(sessionId: string, peerId: number): void {
     void sessionId;
     this.statusRun = new VkStatusRun({ client: this.client, peerId });
     void this.statusRun.start();
+  }
+
+  setCurrentDirectory(directory: string): void {
+    this.currentDirectory = directory;
+  }
+
+  private showPermissionMenu(asked: PermissionAsked): void {
+    const peerId = this.lastOwnerPeerId;
+    if (peerId === null) {
+      return;
+    }
+    buildPermissionMenu(
+      { client: this.client, sender: this.sender },
+      peerId,
+      {
+        requestId: asked.requestId,
+        directory: this.currentDirectory ?? "",
+        tool: asked.permission,
+        patterns: asked.patterns,
+      },
+    );
+  }
+
+  private showQuestionMenu(asked: QuestionAsked): void {
+    const peerId = this.lastOwnerPeerId;
+    if (peerId === null || asked.questions.length === 0) {
+      return;
+    }
+    buildQuestionMenu(
+      { client: this.client, sender: this.sender },
+      peerId,
+      {
+        requestId: asked.requestId,
+        directory: this.currentDirectory ?? "",
+        questions: asked.questions,
+      },
+    );
   }
 
   private async reportActivity(activity: ToolActivity): Promise<void> {

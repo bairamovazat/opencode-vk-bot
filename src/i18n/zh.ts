@@ -613,4 +613,10 @@ export const zh: I18nDictionary = {
   "vk.abort_done": "⏹ 任务已停止。",
   "vk.abort_no_session": "没有正在运行的任务可停止。",
   "vk.abort_failed": "停止任务失败。",
+  "vk.perm_asked": "🔐 需要权限：{tool}",
+  "vk.perm_allowed_once": "✅ 已允许一次：{tool}",
+  "vk.perm_allowed_always": "✅ 已始终允许：{tool}",
+  "vk.perm_rejected": "⛔ 已拒绝：{tool}",
+  "vk.q_answered": "✅ 答案已传达给智能体。",
+  "vk.menu_outdated": "此菜单已过期，请重新请求。",
 };

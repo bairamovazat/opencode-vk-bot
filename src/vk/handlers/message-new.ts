@@ -30,7 +30,7 @@ export interface VkMessageHandlerDeps {
   runCollector: VkRunCollector;
   peerId: number;
   /** Called after the backend accepted the prompt (US2 status start). */
-  onRunStarted?: (sessionId: string) => void;
+  onRunStarted?: (sessionId: string, directory: string) => void;
   /** Called when the owner aborted the current session. */
   onAborted?: (sessionId: string) => void;
 }
@@ -149,7 +149,7 @@ export async function handleOwnerTextMessage(
           return;
         }
         logger.info("[VkBot] session.promptAsync accepted");
-        deps.onRunStarted?.(session.id);
+        deps.onRunStarted?.(session.id, session.directory);
       },
       onError: (error) => {
         foregroundSessionState.markIdle(session.id);

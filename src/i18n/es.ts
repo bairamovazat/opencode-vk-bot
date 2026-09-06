@@ -689,4 +689,10 @@ export const es: I18nDictionary = {
   "vk.abort_done": "⏹ Tarea detenida.",
   "vk.abort_no_session": "No hay tarea en curso que detener.",
   "vk.abort_failed": "No se pudo detener la tarea.",
+  "vk.perm_asked": "🔐 Permiso requerido: {tool}",
+  "vk.perm_allowed_once": "✅ Permitido una vez: {tool}",
+  "vk.perm_allowed_always": "✅ Siempre permitido: {tool}",
+  "vk.perm_rejected": "⛔ Denegado: {tool}",
+  "vk.q_answered": "✅ Respuesta entregada al agente.",
+  "vk.menu_outdated": "Este menú está desactualizado. Solicítalo de nuevo.",
 };

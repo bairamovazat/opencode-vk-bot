@@ -661,6 +661,12 @@ export const en = {
   "vk.abort_done": "⏹ Task stopped.",
   "vk.abort_no_session": "No running task to stop.",
   "vk.abort_failed": "Failed to stop the task.",
+  "vk.perm_asked": "🔐 Permission required: {tool}",
+  "vk.perm_allowed_once": "✅ Allowed once: {tool}",
+  "vk.perm_allowed_always": "✅ Always allowed: {tool}",
+  "vk.perm_rejected": "⛔ Denied: {tool}",
+  "vk.q_answered": "✅ Answer delivered to the agent.",
+  "vk.menu_outdated": "This menu is outdated. Ask again for a fresh one.",
 } as const;
 
 export type I18nKey = keyof typeof en;
