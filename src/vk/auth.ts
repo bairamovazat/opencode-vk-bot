@@ -4,6 +4,8 @@ import type { VkMessageEventUpdate, VkMessageNewUpdate, VkUpdate } from "./types
 export interface OwnerGateOptions {
   groupId: number;
   allowedUserId: number;
+  /** Test-only: also accept messages posted by the community itself. */
+  selfTest?: boolean;
 }
 
 function extractGroupId(update: VkUpdate): number | null {
@@ -28,6 +30,11 @@ function extractEventUserId(update: VkUpdate): number | null {
     const userId = (update as VkMessageEventUpdate).object?.user_id;
     return typeof userId === "number" ? userId : null;
   }
+  if (update.type === "message_reply") {
+    // Community-sent message (self-test path): the sender is the group.
+    const fromId = isRecord(update.object) ? update.object.from_id : undefined;
+    return typeof fromId === "number" ? fromId : null;
+  }
   return null;
 }
 
@@ -44,5 +51,11 @@ export function isOwnerUpdate(update: VkUpdate, options: OwnerGateOptions): bool
   }
 
   const userId = extractEventUserId(update);
-  return userId !== null && userId === options.allowedUserId;
+  if (userId === null) {
+    return false;
+  }
+  if (userId === options.allowedUserId) {
+    return true;
+  }
+  return options.selfTest === true && userId === -options.groupId;
 }

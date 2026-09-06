@@ -15,6 +15,7 @@ Public repo (constitution III): real values only in gitignored `.env`;
 | `VK_API_VERSION` | no | `5.199` | API version sent as `v` |
 | `VK_LONG_POLL_WAIT_SEC` | no | `25` | `a_check` wait (≤ 90, ≥ 5) |
 | `VK_MAX_ATTACHMENT_MB` | no | `45` | incoming/outgoing attachment cap (FR-010) |
+| `VK_SELF_TEST` | no | `false` | **Test-only.** When `1`, community-sent messages (`message_reply` from the group itself, text prefixed `SELFTEST:`) are treated as prompts so the transport can be exercised end-to-end without the owner. MUST stay off in production (constitution III) |
 
 ## Removed (Telegram layer deleted, D3)
 

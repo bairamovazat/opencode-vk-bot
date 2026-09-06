@@ -684,4 +684,7 @@ export const de: I18nDictionary = {
   "local_command.empty_output": "The command produced no output.",
   "local_command.failed": "Command failed with exit code {exitCode}: {stderr}",
   "local_command.timeout": "The command timed out.",
+  "vk.voice_not_configured": "🎙 Spracheingabe ist nicht konfiguriert. Aktiviere VK-Sprachtranskripte oder setze STT_API_URL/STT_API_KEY.",
+  "vk.voice_transcribing": "🎙 Sprachnachricht wird transkribiert…",
+  "vk.voice_transcribe_error": "🎙 Sprachnachricht konnte nicht transkribiert werden.",
 };

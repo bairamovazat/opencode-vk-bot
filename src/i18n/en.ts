@@ -654,6 +654,9 @@ export const en = {
   "local_command.empty_output": "The command produced no output.",
   "local_command.failed": "Command failed with exit code {exitCode}: {stderr}",
   "local_command.timeout": "The command timed out.",
+  "vk.voice_not_configured": "🎙 Voice input is not configured. Enable VK voice transcripts for the community or set STT_API_URL/STT_API_KEY.",
+  "vk.voice_transcribing": "🎙 Transcribing the voice message…",
+  "vk.voice_transcribe_error": "🎙 Failed to transcribe the voice message.",
 } as const;
 
 export type I18nKey = keyof typeof en;

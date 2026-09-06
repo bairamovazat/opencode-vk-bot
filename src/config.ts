@@ -201,14 +201,30 @@ export function buildTelegramConfig(): {
   };
 }
 
-export function buildVkConfig(): {
+interface TelegramBotConfig {
+  token: string;
+  allowedUserId: number;
+  proxyUrl: string;
+  apiRoot: string;
+  proxySecret: string;
+  forceIpv4: boolean;
+}
+
+interface VkBotConfig {
   groupToken: string;
   groupId: number;
   allowedUserId: number;
   apiVersion: string;
   longPollWaitSec: number;
   maxAttachmentMb: number;
-} {
+  selfTest: boolean;
+}
+
+export function buildVkConfig(): VkBotConfig {
+  // Self-test mode: additionally accept messages posted by the community
+  // itself so the transport can be exercised without the owner. Test-only;
+  // must stay disabled in production (constitution III).
+
   const groupId = parseInt(getEnvVar("VK_GROUP_ID"), 10);
   if (Number.isNaN(groupId) || groupId <= 0) {
     throw new Error("VK_GROUP_ID must be a positive integer (community id without the minus sign).");
@@ -231,11 +247,22 @@ export function buildVkConfig(): {
     apiVersion: getEnvVar("VK_API_VERSION", false) || "5.199",
     longPollWaitSec,
     maxAttachmentMb: getOptionalPositiveIntEnvVar("VK_MAX_ATTACHMENT_MB", 45),
+    selfTest: getOptionalBooleanEnvVar("VK_SELF_TEST", false),
   };
 }
 
+// Transport sections build lazily: the VK port runs without Telegram
+// credentials, and the Telegram layer disappears entirely in the cleanup
+// phase. Memoized so repeated accesses reuse the first parse.
+let telegramConfigCache: TelegramBotConfig | null = null;
+
 export const config = {
-  telegram: buildTelegramConfig(),
+  get telegram(): TelegramBotConfig {
+    if (!telegramConfigCache) {
+      telegramConfigCache = buildTelegramConfig();
+    }
+    return telegramConfigCache;
+  },
   vk: buildVkConfig(),
   opencode: {
     apiUrl: getEnvVar("OPENCODE_API_URL", false) || "http://localhost:4096",

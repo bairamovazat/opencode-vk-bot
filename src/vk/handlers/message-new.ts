@@ -13,8 +13,10 @@ import { getStoredAgent, resolveProjectAgent } from "../../app/services/agent-se
 import { getStoredModel } from "../../app/services/model-selection-service.js";
 import { foregroundSessionState } from "../../app/managers/foreground-session-state-manager.js";
 import { safeBackgroundTask } from "../../utils/safe-background-task.js";
+import { isSttConfigured, transcribeAudio } from "../../app/services/stt-service.js";
 import { formatErrorDetails } from "../../utils/error-format.js";
 import { logger } from "../../utils/logger.js";
+import { isRecord } from "../../utils/type-guards.js";
 import { t } from "../../i18n/index.js";
 import type { VkMessage } from "../types.js";
 import type { VkSender } from "../send.js";
@@ -39,11 +41,23 @@ export async function handleOwnerTextMessage(
 ): Promise<void> {
   const { sender, runCollector, peerId } = deps;
 
-  if (message.text.trim().length === 0) {
+  const hasVoice = (message.attachments ?? []).some(
+    (attachment) => attachment.type === "audio_message",
+  );
+  if (message.text.trim().length === 0 && !hasVoice) {
     return;
   }
 
   try {
+    const speech = await resolveVoiceInput(message, sender, peerId);
+    if (speech === null) {
+      return;
+    }
+    const promptText = [message.text.trim(), speech].filter((part) => part.length > 0).join("\n");
+    if (promptText.length === 0) {
+      return;
+    }
+
     const project = await ensureProjectSelected(sender, peerId);
     if (!project) {
       return;
@@ -87,7 +101,7 @@ export async function handleOwnerTextMessage(
 
     const currentAgent = await resolveProjectAgent(getStoredAgent());
     const storedModel = getStoredModel();
-    const parts: Array<TextPartInput | FilePartInput> = [{ type: "text", text: message.text }];
+    const parts: Array<TextPartInput | FilePartInput> = [{ type: "text", text: promptText }];
 
     logger.info(
       `[VkBot] Dispatching promptAsync session=${session.id} agent=${currentAgent ?? "default"}`,
@@ -158,6 +172,89 @@ async function ensureProjectSelected(
 
   setCurrentProject(first);
   return first;
+}
+
+/**
+ * Voice input (US8): VK often carries its own transcript inside
+ * `audio_message`; when absent (or pending) and a Whisper-compatible STT
+ * endpoint is configured, the audio is downloaded and transcribed.
+ * Returns the extra prompt text ("") when there is no voice input, or null
+ * when the prompt cannot be built at all.
+ */
+async function resolveVoiceInput(
+  message: VkMessage,
+  sender: VkSender,
+  peerId: number,
+): Promise<string | null> {
+  const voiceMessages = (message.attachments ?? []).filter(
+    (attachment) => attachment.type === "audio_message" && isRecord(attachment.audio_message),
+  );
+  if (voiceMessages.length === 0) {
+    return "";
+  }
+
+  const transcripts: string[] = [];
+  let sttAttempted = false;
+  let sttAvailable = false;
+
+  for (const attachment of voiceMessages) {
+    const audio = attachment.audio_message as Record<string, unknown>;
+    const transcript =
+      audio.transcript_state === "done" && typeof audio.transcript === "string"
+        ? audio.transcript.trim()
+        : "";
+    if (transcript.length > 0) {
+      transcripts.push(transcript);
+      continue;
+    }
+    const url = typeof audio.url === "string" ? audio.url : "";
+    if (!isSttConfigured() || !url) {
+      continue;
+    }
+    sttAvailable = true;
+    sttAttempted = true;
+    const transcribed = await downloadAndTranscribe(url, sender, peerId);
+    if (transcribed !== null) {
+      transcripts.push(transcribed);
+    }
+  }
+
+  if (transcripts.length === 0) {
+    if (message.text.trim().length > 0) {
+      await sender.sendText(peerId, t("vk.voice_transcribe_error"));
+      return message.text.trim();
+    }
+    await sender.sendText(
+      peerId,
+      sttAttempted && sttAvailable
+        ? t("vk.voice_transcribe_error")
+        : t("vk.voice_not_configured"),
+    );
+    return null;
+  }
+
+  return transcripts.map((text) => `(голосовое сообщение): ${text}`).join("\n");
+}
+
+async function downloadAndTranscribe(
+  url: string,
+  sender: VkSender,
+  peerId: number,
+): Promise<string | null> {
+  try {
+    await sender.sendText(peerId, t("vk.voice_transcribing"));
+    const response = await fetch(url);
+    if (!response.ok) {
+      logger.warn("[VkBot] Voice download failed", { status: response.status });
+      return null;
+    }
+    const buffer = Buffer.from(await response.arrayBuffer());
+    const result = await transcribeAudio(buffer, "voice.ogg");
+    return result.text.trim();
+  } catch (error) {
+    logger.error("[VkBot] Voice transcription failed:", error);
+    return null;
+  }
 }
 
 async function isSessionBusy(sessionId: string, directory: string): Promise<boolean> {

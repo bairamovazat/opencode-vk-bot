@@ -664,4 +664,7 @@ export const ko: I18nDictionary = {
   "local_command.empty_output": "The command produced no output.",
   "local_command.failed": "Command failed with exit code {exitCode}: {stderr}",
   "local_command.timeout": "The command timed out.",
+  "vk.voice_not_configured": "🎙 음성 입력이 구성되지 않았습니다. VK 음성 전사를 활성화하거나 STT_API_URL/STT_API_KEY를 설정하세요.",
+  "vk.voice_transcribing": "🎙 음성 메시지를 전사하는 중…",
+  "vk.voice_transcribe_error": "🎙 음성 메시지 전사에 실패했습니다.",
 };

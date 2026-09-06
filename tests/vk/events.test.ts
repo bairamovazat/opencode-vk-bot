@@ -97,6 +97,34 @@ describe("event normalizer", () => {
     expect(eventOrThrow(normalizer.normalize(messageNew("other"))).kind).toBe("message");
   });
 
+  it("turns marked community replies into prompts only in self-test mode", () => {
+    const update = {
+      type: "message_reply",
+      group_id: 12345,
+      object: { id: 9, date: 2, peer_id: 158377194, from_id: -12345, text: "SELFTEST: ping" },
+    };
+
+    const strict = new VkEventNormalizer(OPTIONS);
+    expect(strict.normalize(update)).toBeNull();
+
+    const harness = new VkEventNormalizer({ ...OPTIONS, selfTest: true });
+    expect(harness.normalize(update)).toMatchObject({
+      kind: "message",
+      message: { text: "ping", from_id: -12345, peer_id: 158377194 },
+    });
+  });
+
+  it("drops unmarked community replies even in self-test mode", () => {
+    const harness = new VkEventNormalizer({ ...OPTIONS, selfTest: true });
+    const update = {
+      type: "message_reply",
+      group_id: 12345,
+      object: { id: 10, date: 2, peer_id: 158377194, from_id: -12345, text: "обычный ответ бота" },
+    };
+
+    expect(harness.normalize(update)).toBeNull();
+  });
+
   it("evicts the oldest event_id when the dedup window overflows", () => {
     const normalizer = new VkEventNormalizer({ ...OPTIONS, maxTrackedEventIds: 2 });
 

@@ -30,6 +30,7 @@ export class VkBot {
     this.normalizer = new VkEventNormalizer({
       groupId: config.vk.groupId,
       allowedUserId: config.vk.allowedUserId,
+      selfTest: config.vk.selfTest,
     });
     this.runCollector = new VkRunCollector({
       onComplete: (result) => this.deliverRunResult(result),

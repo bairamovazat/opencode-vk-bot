@@ -63,6 +63,22 @@ vi.mock("../../../src/utils/safe-background-task.js", () => ({
 
 import { handleOwnerTextMessage } from "../../../src/vk/handlers/message-new.js";
 
+const voiceMessage = (transcript?: string, state = "done"): VkMessage => ({
+  id: 2,
+  date: 2,
+  peer_id: PEER,
+  from_id: 42,
+  text: "",
+  attachments: [
+    {
+      type: "audio_message",
+      audio_message: transcript === undefined
+        ? { url: "https://vk.example/voice.ogg" }
+        : { url: "https://vk.example/voice.ogg", transcript, transcript_state: state },
+    },
+  ],
+});
+
 const PEER = 2000000042;
 const PROJECT = { worktree: "/repo", id: "p1", name: "repo" } as const;
 const SESSION = { id: "ses-1", title: "repo", directory: "/repo" } as const;
@@ -168,6 +184,37 @@ describe("vk message-new handler (US1)", () => {
 
     expect(mocks.clearSession).toHaveBeenCalled();
     expect(mocks.sessionCreate).toHaveBeenCalled();
+  });
+
+  it("uses the VK transcript of a voice message as the prompt", async () => {
+    mocks.getCurrentProject.mockReturnValue(PROJECT);
+    mocks.getCurrentSession.mockReturnValue(SESSION);
+    const { sender, runCollector } = createDeps();
+
+    await handleOwnerTextMessage(voiceMessage("проверка связи"), {
+      sender,
+      runCollector,
+      peerId: PEER,
+    });
+
+    const promptArgs = defined(mocks.sessionPromptAsync.mock.calls[0])[0];
+    expect(promptArgs.parts[0].text).toContain("(голосовое сообщение): проверка связи");
+  });
+
+  it("rejects an untranscribed voice message when STT is not configured", async () => {
+    mocks.getCurrentProject.mockReturnValue(PROJECT);
+    mocks.getCurrentSession.mockReturnValue(SESSION);
+    const { sender } = createDeps();
+
+    await handleOwnerTextMessage(voiceMessage(undefined), {
+      sender,
+      runCollector: createDeps().runCollector,
+      peerId: PEER,
+    });
+
+    const sentTexts = (sender.sendText as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[1]);
+    expect(sentTexts.some((text: string) => text.includes("not configured"))).toBe(true);
+    expect(mocks.sessionPromptAsync).not.toHaveBeenCalled();
   });
 
   it("ignores empty text messages", async () => {

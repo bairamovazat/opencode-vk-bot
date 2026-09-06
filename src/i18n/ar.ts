@@ -637,4 +637,7 @@ export const ar: I18nDictionary = {
   "local_command.empty_output": "The command produced no output.",
   "local_command.failed": "Command failed with exit code {exitCode}: {stderr}",
   "local_command.timeout": "The command timed out.",
+  "vk.voice_not_configured": "🎙 إدخال الصوت غير مهيأ. فعّل نصوص VK الصوتية أو عيّن STT_API_URL/STT_API_KEY.",
+  "vk.voice_transcribing": "🎙 جارٍ تفريغ الرسالة الصوتية…",
+  "vk.voice_transcribe_error": "🎙 تعذّر تفريغ الرسالة الصوتية.",
 };

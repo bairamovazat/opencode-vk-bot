@@ -46,6 +46,10 @@ export class VkRunCollector {
    * OpenCode event stream for its directory. The subscription is shared
    * per directory inside opencode/events.ts; the callback below simply
    * replaces the previous one.
+   *
+   * IMPORTANT: subscribeToEvents is a long-running listener (it resolves
+   * only when the stream stops), so it is fired, not awaited — awaiting it
+   * would freeze the caller for the entire lifetime of the stream.
    */
   async begin(sessionId: string, directory: string): Promise<void> {
     this.run = {
@@ -55,7 +59,9 @@ export class VkRunCollector {
       partOrder: new Map(),
       nextOrder: 0,
     };
-    await subscribeToEvents(directory, (event) => this.processEvent(event));
+    subscribeToEvents(directory, (event) => this.processEvent(event)).catch((error) => {
+      logger.error("[VkRunCollector] Event subscription failed", error);
+    });
   }
 
   isActive(): boolean {

@@ -75,4 +75,24 @@ describe("owner gate", () => {
 
     expect(isOwnerUpdate(update, GATE)).toBe(false);
   });
+
+  it("self-test mode accepts a community-sent message_reply", () => {
+    const update = {
+      type: "message_reply",
+      group_id: 12345,
+      object: { id: 5, peer_id: 158377194, from_id: -12345, text: "SELFTEST: ping" },
+    };
+
+    expect(isOwnerUpdate(update, { ...GATE, selfTest: true })).toBe(true);
+  });
+
+  it("without self-test mode community messages stay rejected", () => {
+    const update = {
+      type: "message_reply",
+      group_id: 12345,
+      object: { id: 5, peer_id: 158377194, from_id: -12345, text: "SELFTEST: ping" },
+    };
+
+    expect(isOwnerUpdate(update, GATE)).toBe(false);
+  });
 });

@@ -66,7 +66,44 @@ export class VkEventNormalizer {
     if (raw.type === "message_event") {
       return this.normalizeMessageEvent(raw);
     }
+    if (raw.type === "message_reply") {
+      // Community-sent messages are only turned into prompts by the
+      // self-test harness (VK_SELF_TEST=1, research contract: test-only).
+      if (this.options.selfTest !== true) {
+        return null;
+      }
+      return this.normalizeSelfTestReply(raw);
+    }
     return null;
+  }
+
+  private normalizeSelfTestReply(raw: Record<string, unknown>): NormalizedMessageEvent | null {
+    const object = isRecord(raw.object) ? raw.object : null;
+    if (!object) {
+      return null;
+    }
+    const fromId = typeof object.from_id === "number" ? object.from_id : 0;
+    if (fromId !== -this.options.groupId) {
+      return null;
+    }
+    // Loop guard: only messages explicitly marked for the harness become
+    // prompts; ordinary bot replies (without the marker) are ignored.
+    const rawText = typeof object.text === "string" ? object.text : "";
+    const marker = "SELFTEST:";
+    if (!rawText.startsWith(marker)) {
+      return null;
+    }
+    const peerId = typeof object.peer_id === "number" ? object.peer_id : 0;
+    return {
+      kind: "message",
+      message: {
+        id: typeof object.id === "number" ? object.id : 0,
+        date: typeof object.date === "number" ? object.date : 0,
+        peer_id: peerId,
+        from_id: fromId,
+        text: rawText.slice(marker.length).trim(),
+      },
+    };
   }
 
   private remember(eventId: string): void {
