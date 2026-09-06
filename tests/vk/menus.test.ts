@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { VkSender } from "../../../src/vk/send.js";
-import type { NormalizedButtonEvent } from "../../../src/vk/events.js";
-import type { VkApiClient } from "../../../src/vk/client.js";
+import type { VkSender } from "../../src/vk/send.js";
+import type { NormalizedButtonEvent } from "../../src/vk/events.js";
+import type { VkApiClient } from "../../src/vk/client.js";
 
 const mocks = vi.hoisted(() => ({
   permissionReply: vi.fn(),
