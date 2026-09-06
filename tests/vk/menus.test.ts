@@ -36,14 +36,17 @@ function createDeps() {
 }
 
 function buttonEvent(payload?: string): NormalizedButtonEvent {
-  return {
+  const event: NormalizedButtonEvent = {
     kind: "button",
     userId: 42,
     peerId: PEER,
     eventId: `evt-${Math.random()}`,
-    payload,
     conversationMessageId: 1,
   };
+  if (payload !== undefined) {
+    event.payload = payload;
+  }
+  return event;
 }
 
 async function lastKeyboard(sender: VkSender): Promise<{ buttons: Array<Array<{ action: { payload: string; label: string } }>> }> {
