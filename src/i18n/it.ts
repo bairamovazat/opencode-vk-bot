@@ -694,4 +694,9 @@ export const it: I18nDictionary = {
   "vk.rename_no_session": "Nessuna sessione attiva da rinominare.",
   "vk.status_state_idle": "Inattivo",
   "vk.status_state_busy": "Occupato (attività in corso)",
+  "vk.projects_header": "Progetti: tocca per cambiare:",
+  "vk.project_switched": "✅ Progetto cambiato: {project}",
+  "vk.models_header": "Modelli: tocca per cambiare:",
+  "vk.model_switched": "✅ Modello cambiato: {model}",
+  "vk.models_empty": "Nessun modello disponibile.",
 };

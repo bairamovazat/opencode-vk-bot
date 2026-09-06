@@ -688,4 +688,9 @@ export const ru: I18nDictionary = {
   "vk.rename_no_session": "Нет активной сессии для переименования.",
   "vk.status_state_idle": "Простой",
   "vk.status_state_busy": "Занят (выполняет задачу)",
+  "vk.projects_header": "Проекты — нажми, чтобы переключить:",
+  "vk.project_switched": "✅ Проект переключён: {project}",
+  "vk.models_header": "Модели — нажми, чтобы переключить:",
+  "vk.model_switched": "✅ Модель переключена: {model}",
+  "vk.models_empty": "Доступных моделей нет.",
 };

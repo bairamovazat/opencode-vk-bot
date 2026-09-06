@@ -37,12 +37,27 @@ export interface QuestionMenuData {
   answers: Array<string[]>;
 }
 
+export interface ProjectsMenuData {
+  kind: "prj";
+  projects: Array<{ id: string; name: string }>;
+}
+
+export interface ModelsMenuData {
+  kind: "mdl";
+  models: Array<{ providerID: string; modelID: string; label: string }>;
+}
+
 export interface SessionsMenuData {
   kind: "sess";
   sessions: Array<{ id: string; title: string; directory: string }>;
 }
 
-type MenuData = PermissionMenuData | QuestionMenuData | SessionsMenuData;
+type MenuData =
+  | PermissionMenuData
+  | QuestionMenuData
+  | SessionsMenuData
+  | ProjectsMenuData
+  | ModelsMenuData;
 
 export interface MenuDeps {
   /** VK API client used only for the button spinner answer. */
@@ -205,6 +220,78 @@ async function sendKeyboard(
   await deps.sender.sendText(peerId, text, { keyboard });
 }
 
+export async function buildProjectsMenu(
+  deps: MenuDeps,
+  peerId: number,
+  projects: ProjectsMenuData["projects"],
+  textFallback?: string | undefined,
+): Promise<void> {
+  const id = createMenuId();
+  const menu: ProjectsMenuData = { kind: "prj", projects };
+  menus.set(id, menu);
+
+  const rows = projects.slice(0, MAX_BUTTONS).map((project): VkButton[] => [
+    {
+      action: {
+        type: "callback",
+        label: project.name.slice(0, 40),
+        payload: packPayload({
+          v: PAYLOAD_VERSION,
+          k: "prj",
+          s: id,
+          a: "pick",
+          x: projects.indexOf(project),
+        }),
+      },
+    },
+  ]);
+  const keyboard = { inline: true, buttons: rows };
+  if (Buffer.byteLength(JSON.stringify(keyboard), "utf8") > MAX_KEYBOARD_BYTES) {
+    await deps.sender.sendText(peerId, textFallback ?? t("vk.projects_header"));
+    return;
+  }
+  await deps.sender.sendText(peerId, t("vk.projects_header"), {
+    keyboard,
+    fallbackText: textFallback,
+  });
+}
+
+export async function buildModelsMenu(
+  deps: MenuDeps,
+  peerId: number,
+  models: ModelsMenuData["models"],
+  textFallback?: string | undefined,
+): Promise<void> {
+  const id = createMenuId();
+  const menu: ModelsMenuData = { kind: "mdl", models };
+  menus.set(id, menu);
+
+  const rows = models.slice(0, MAX_BUTTONS).map((model): VkButton[] => [
+    {
+      action: {
+        type: "callback",
+        label: model.label.slice(0, 40),
+        payload: packPayload({
+          v: PAYLOAD_VERSION,
+          k: "mdl",
+          s: id,
+          a: "pick",
+          x: models.indexOf(model),
+        }),
+      },
+    },
+  ]);
+  const keyboard = { inline: true, buttons: rows };
+  if (Buffer.byteLength(JSON.stringify(keyboard), "utf8") > MAX_KEYBOARD_BYTES) {
+    await deps.sender.sendText(peerId, textFallback ?? t("vk.models_header"));
+    return;
+  }
+  await deps.sender.sendText(peerId, t("vk.models_header"), {
+    keyboard,
+    fallbackText: textFallback,
+  });
+}
+
 export async function buildSessionsMenu(
   deps: MenuDeps,
   peerId: number,
@@ -272,6 +359,16 @@ export async function handleMenuButton(deps: MenuDeps, event: NormalizedButtonEv
     return;
   }
 
+  if (menu.kind === "prj" && payload.k === "prj" && payload.a === "pick") {
+    await pickProject(deps.sender, event, payload.s, menu, payload.x ?? 0);
+    return;
+  }
+
+  if (menu.kind === "mdl" && payload.k === "mdl" && payload.a === "pick") {
+    await pickModel(deps.sender, event, payload.s, menu, payload.x ?? 0);
+    return;
+  }
+
   await sendMessageEventAnswer(client, event);
 }
 
@@ -292,6 +389,51 @@ async function pickSession(
   const { setCurrentSession } = await import("../app/services/session-service.js");
   setCurrentSession({ id: session.id, title: session.title, directory: session.directory });
   await sender.sendText(event.peerId, t("vk.session_resumed", { title: session.title }));
+}
+
+async function pickProject(
+  sender: VkSender,
+  event: NormalizedButtonEvent,
+  id: string,
+  menu: ProjectsMenuData,
+  index: number,
+): Promise<void> {
+  await sendMessageEventAnswer(vkClient, event);
+  const project = menu.projects[index];
+  if (!project) {
+    return;
+  }
+  resolveMenu(id);
+  const { setCurrentProject } = await import("../app/stores/settings-store.js");
+  const { getProjects } = await import("../app/services/project-service.js");
+  const projects = await getProjects();
+  const full = projects.find((p) => p.id === project.id);
+  if (!full) {
+    return;
+  }
+  setCurrentProject(full);
+  // Session belongs to the old project: clear it (mismatch rule).
+  const { clearSession } = await import("../app/services/session-service.js");
+  clearSession();
+  await sender.sendText(event.peerId, t("vk.project_switched", { project: project.name }));
+}
+
+async function pickModel(
+  sender: VkSender,
+  event: NormalizedButtonEvent,
+  id: string,
+  menu: ModelsMenuData,
+  index: number,
+): Promise<void> {
+  await sendMessageEventAnswer(vkClient, event);
+  const model = menu.models[index];
+  if (!model) {
+    return;
+  }
+  resolveMenu(id);
+  const { selectModel } = await import("../app/services/model-selection-service.js");
+  selectModel({ providerID: model.providerID, modelID: model.modelID });
+  await sender.sendText(event.peerId, t("vk.model_switched", { model: model.label }));
 }
 
 async function resolvePermission(

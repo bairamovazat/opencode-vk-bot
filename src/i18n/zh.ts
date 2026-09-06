@@ -630,4 +630,9 @@ export const zh: I18nDictionary = {
   "vk.rename_no_session": "没有可重命名的活动会话。",
   "vk.status_state_idle": "空闲",
   "vk.status_state_busy": "忙碌（正在执行任务）",
+  "vk.projects_header": "项目 — 点击切换：",
+  "vk.project_switched": "✅ 项目已切换：{project}",
+  "vk.models_header": "模型 — 点击切换：",
+  "vk.model_switched": "✅ 模型已切换：{model}",
+  "vk.models_empty": "没有可用模型。",
 };

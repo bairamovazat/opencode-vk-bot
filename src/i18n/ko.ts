@@ -688,4 +688,9 @@ export const ko: I18nDictionary = {
   "vk.rename_no_session": "이름을 바꿀 활성 세션이 없습니다.",
   "vk.status_state_idle": "유휴",
   "vk.status_state_busy": "사용 중(작업 실행 중)",
+  "vk.projects_header": "프로젝트 — 탭하여 전환:",
+  "vk.project_switched": "✅ 프로젝트 전환됨: {project}",
+  "vk.models_header": "모델 — 탭하여 전환:",
+  "vk.model_switched": "✅ 모델 전환됨: {model}",
+  "vk.models_empty": "사용 가능한 모델이 없습니다.",
 };

@@ -678,6 +678,11 @@ export const en = {
   "vk.rename_no_session": "No active session to rename.",
   "vk.status_state_idle": "Idle",
   "vk.status_state_busy": "Busy (running a task)",
+  "vk.projects_header": "Projects — tap to switch:",
+  "vk.project_switched": "✅ Project switched: {project}",
+  "vk.models_header": "Models — tap to switch:",
+  "vk.model_switched": "✅ Model switched: {model}",
+  "vk.models_empty": "No models available.",
 } as const;
 
 export type I18nKey = keyof typeof en;

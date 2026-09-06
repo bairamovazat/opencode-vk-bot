@@ -6,6 +6,8 @@ import { handleSessionsCommand } from "./sessions.js";
 import { handleStatusCommand } from "./status.js";
 import { handleRenameCommand } from "./rename.js";
 import { handleHelpCommand } from "./help.js";
+import { handleProjectsCommand } from "./projects.js";
+import { handleModelsCommand } from "./models.js";
 
 export interface CommandDeps {
   sender: VkSender;
@@ -65,6 +67,12 @@ export async function handleCommandIfRequested(
       return true;
     case "rename":
       await handleRenameCommand(command.args, sender, peerId);
+      return true;
+    case "projects":
+      await handleProjectsCommand(sender, peerId);
+      return true;
+    case "models":
+      await handleModelsCommand(sender, peerId);
       return true;
     case "help":
     case "start":

@@ -661,4 +661,9 @@ export const ar: I18nDictionary = {
   "vk.rename_no_session": "لا توجد جلسة نشطة لإعادة التسمية.",
   "vk.status_state_idle": "خامل",
   "vk.status_state_busy": "مشغول (يؤدي مهمة)",
+  "vk.projects_header": "المشاريع — انقر للتبديل:",
+  "vk.project_switched": "✅ تم تبديل المشروع: {project}",
+  "vk.models_header": "النماذج — انقر للتبديل:",
+  "vk.model_switched": "✅ تم تبديل النموذج: {model}",
+  "vk.models_empty": "لا توجد نماذج متاحة.",
 };
