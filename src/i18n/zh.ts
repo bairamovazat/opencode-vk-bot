@@ -636,4 +636,6 @@ export const zh: I18nDictionary = {
   "vk.model_switched": "✅ 模型已切换：{model}",
   "vk.models_empty": "没有可用模型。",
   "vk.attachment_failed": "⚠️ 有 {count} 个附件下载失败。",
+  "vk.run_started": "⚙️ 任务已开始。控制按钮见下。",
+  "vk.menu_main_hint": "🏠 主菜单。",
 };

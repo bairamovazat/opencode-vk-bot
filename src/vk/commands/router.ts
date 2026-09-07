@@ -6,7 +6,7 @@ import { handleSessionsCommand } from "./sessions.js";
 import { handleStatusCommand } from "./status.js";
 import { handleRenameCommand } from "./rename.js";
 import { handleHelpCommand } from "./help.js";
-import { resolveButtonText } from "../keyboards.js";
+import { resolveButtonText, setView } from "../keyboards.js";
 import { handleProjectsCommand } from "./projects.js";
 import { handleModelsCommand } from "./models.js";
 
@@ -54,6 +54,7 @@ export async function handleCommandIfRequested(
         if (active) {
           deps.onAborted?.(active.id);
         }
+        setView(peerId, "main");
       }
       return outcome.handled;
     }

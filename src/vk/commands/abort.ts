@@ -54,7 +54,7 @@ export async function handleAbortIfRequested(
 
     logger.info(`[VkBot] Aborted session ${session.id}`);
     markSessionAborted(session.id);
-    await sender.sendText(peerId, t("vk.abort_done"));
+    await sender.sendText(peerId, t("vk.abort_done"), { mainKeyboard: true });
   } catch (error) {
     logger.error("[VkBot] Abort failed:", error);
     await sender.sendText(peerId, t("vk.abort_failed"));

@@ -667,4 +667,6 @@ export const ar: I18nDictionary = {
   "vk.model_switched": "✅ تم تبديل النموذج: {model}",
   "vk.models_empty": "لا توجد نماذج متاحة.",
   "vk.attachment_failed": "⚠️ تعذّر تنزيل {count} من المرفقات.",
+  "vk.run_started": "⚙️ بدأت المهمة. التحكم بالأزرار أدناه.",
+  "vk.menu_main_hint": "🏠 القائمة الرئيسية.",
 };

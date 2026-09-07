@@ -10,6 +10,7 @@ import {
   type QuestionAsked,
 } from "./run-collector.js";
 import { buildPermissionMenu, buildQuestionMenu } from "./menus.js";
+import { buildRunKeyboard, setView } from "./keyboards.js";
 import { VkStatusRun } from "./status.js";
 import { handleOwnerTextMessage, type VkMessageHandlerDeps } from "./handlers/message-new.js";
 import { markSessionAborted } from "./commands/abort.js";
@@ -112,8 +113,10 @@ export class VkBot {
 
   private startStatusRun(sessionId: string, peerId: number): void {
     void sessionId;
-    this.statusRun = new VkStatusRun({ client: this.client, peerId });
-    void this.statusRun.start();
+    setView(peerId, "run");
+    void this.sender.sendText(peerId, t("vk.run_started"), {
+      keyboard: buildRunKeyboard(),
+    });
   }
 
   setCurrentDirectory(directory: string): void {
@@ -172,6 +175,7 @@ export class VkBot {
       logger.warn("[VkBot] Run finished but no owner dialog is known yet");
       return;
     }
+    setView(peerId, "main");
 
     const text = renderMarkdownToPlainText(result.text);
     if (text.length === 0) {
@@ -179,7 +183,7 @@ export class VkBot {
       return;
     }
 
-    await this.sender.sendText(peerId, text);
+    await this.sender.sendText(peerId, text, { mainKeyboard: true });
   }
 
   private async deliverRunError(sessionId: string, message: string): Promise<void> {
@@ -190,11 +194,12 @@ export class VkBot {
       return;
     }
     const peerId = this.lastOwnerPeerId;
+    setView(peerId ?? config.vk.allowedUserId, "main");
     logger.error("[VkBot] Delivering run error to dialog", { sessionId, message });
     if (peerId === null) {
       return;
     }
-    await this.sender.sendText(peerId, t("error.generic"));
+    await this.sender.sendText(peerId, t("error.generic"), { mainKeyboard: true });
   }
 }
 

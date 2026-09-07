@@ -713,4 +713,6 @@ export const fr: I18nDictionary = {
   "vk.model_switched": "✅ Modèle changé : {model}",
   "vk.models_empty": "Aucun modèle disponible.",
   "vk.attachment_failed": "⚠️ Échec du téléchargement de {count} pièce(s) jointe(s).",
+  "vk.run_started": "⚙️ Tâche lancée. Contrôles ci-dessous.",
+  "vk.menu_main_hint": "🏠 Menu principal.",
 };

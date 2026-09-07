@@ -684,6 +684,8 @@ export const en = {
   "vk.model_switched": "✅ Model switched: {model}",
   "vk.models_empty": "No models available.",
   "vk.attachment_failed": "⚠️ Failed to download {count} attachment(s).",
+  "vk.run_started": "⚙️ Task started. Controls below.",
+  "vk.menu_main_hint": "🏠 Main menu.",
 } as const;
 
 export type I18nKey = keyof typeof en;
