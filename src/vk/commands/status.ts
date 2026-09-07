@@ -33,5 +33,6 @@ export async function handleStatusCommand(sender: VkSender, peerId: number): Pro
       model: model.modelID || t("status.project_not_selected"),
       state,
     }),
+    { mainKeyboard: true },
   );
 }

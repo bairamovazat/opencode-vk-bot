@@ -85,6 +85,8 @@ export interface SendTextOptions {
   keyboard?: unknown;
   /** Text used when the keyboard is rejected (VK error 912). */
   fallbackText?: string | undefined;
+  /** Attach the persistent main command keyboard (reply keyboard). */
+  mainKeyboard?: boolean | undefined;
   attachment?: string;
 }
 
@@ -122,7 +124,10 @@ export class VkSender {
       if (options.silent) {
         params.disable_notification = true;
       }
-      if (options.keyboard) {
+      if (options.mainKeyboard) {
+        const { buildMainReplyKeyboard } = await import("./keyboards.js");
+        params.keyboard = JSON.stringify(buildMainReplyKeyboard());
+      } else if (options.keyboard) {
         params.keyboard = JSON.stringify(options.keyboard);
         if (options.fallbackText) {
           params.fallbackMessage = options.fallbackText;

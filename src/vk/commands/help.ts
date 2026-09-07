@@ -11,5 +11,5 @@ export async function handleHelpCommand(sender: VkSender, peerId: number): Promi
     "• /rename <новое_название> — " + t("cmd.description.rename"),
     "• /abort — " + t("cmd.description.stop"),
   ];
-  await sender.sendText(peerId, lines.join("\n"));
+  await sender.sendText(peerId, lines.join("\n"), { mainKeyboard: true });
 }

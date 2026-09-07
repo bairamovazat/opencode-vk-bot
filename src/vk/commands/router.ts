@@ -6,6 +6,7 @@ import { handleSessionsCommand } from "./sessions.js";
 import { handleStatusCommand } from "./status.js";
 import { handleRenameCommand } from "./rename.js";
 import { handleHelpCommand } from "./help.js";
+import { resolveButtonText } from "../keyboards.js";
 import { handleProjectsCommand } from "./projects.js";
 import { handleModelsCommand } from "./models.js";
 
@@ -17,7 +18,7 @@ export interface CommandDeps {
 }
 
 export function parseCommand(text: string): { name: string; args: string } | null {
-  const trimmed = text.trim();
+  const trimmed = resolveButtonText(text).trim();
   if (!trimmed.startsWith("/")) {
     return null;
   }

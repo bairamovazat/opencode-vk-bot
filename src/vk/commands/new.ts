@@ -12,5 +12,5 @@ export async function handleNewCommand(sender: VkSender, peerId: number): Promis
   }
   clearSession();
   logger.info("[VkBot] Session cleared via /new");
-  await sender.sendText(peerId, t("vk.new_cleared"));
+  await sender.sendText(peerId, t("vk.new_cleared"), { mainKeyboard: true });
 }

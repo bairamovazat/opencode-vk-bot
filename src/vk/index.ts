@@ -75,6 +75,9 @@ export class VkBot {
   }
 
   private async handleUpdate(update: unknown): Promise<void> {
+    logger.debug(
+      `[VkBot] update: ${JSON.stringify(update).slice(0, 300)}`,
+    );
     const event = this.normalizer.normalize(update);
     if (!event) {
       return;
