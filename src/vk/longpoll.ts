@@ -100,15 +100,36 @@ export class VkLongPoll {
       }
 
       const updates = Array.isArray(data.updates) ? data.updates : [];
-      // ts advances only after every handler succeeded: a thrown handler
-      // (or an abort mid-batch) leaves the position untouched so the batch
-      // is redelivered on the next poll (at-least-once; duplicates are
-      // dropped downstream by event_id).
+      // ts advances only after every handler succeeded (at-least-once):
+      // a thrown handler leaves the position untouched so the batch is
+      // redelivered — but the SAME event is retried at most 3 times, after
+      // which it is skipped (logged) so one poisoned event cannot wedge
+      // the poll loop forever.
       for (const update of updates) {
         if (this.isAborted()) {
           return;
         }
-        await this.onUpdate(update);
+        let attempts = 0;
+        for (;;) {
+          try {
+            await this.onUpdate(update);
+            break;
+          } catch (error) {
+            attempts += 1;
+            logger.warn(
+              `[VkLongPoll] Handler attempt ${attempts} failed for one update`,
+              error,
+            );
+            if (attempts >= 3) {
+              logger.error(
+                "[VkLongPoll] Handler failed 3 times for one update, skipping it",
+                { error },
+              );
+              break;
+            }
+            await this.sleep(500 * attempts);
+          }
+        }
       }
 
       if (typeof data.ts === "string") {

@@ -10,7 +10,7 @@ import {
   type QuestionAsked,
 } from "./run-collector.js";
 import { buildPermissionMenu, buildQuestionMenu } from "./menus.js";
-import { buildRunKeyboard, setView } from "./keyboards.js";
+import { buildRunKeyboard, setView, type KeyboardAction } from "./keyboards.js";
 import { VkStatusRun } from "./status.js";
 import { handleOwnerTextMessage, type VkMessageHandlerDeps } from "./handlers/message-new.js";
 import { markSessionAborted } from "./commands/abort.js";
@@ -108,7 +108,60 @@ export class VkBot {
    * client does not hang, and the tap is otherwise ignored.
    */
   private async handleButtonEvent(event: NormalizedEvent & { kind: "button" }): Promise<void> {
-    await handleMenuButton({ client: this.client, sender: this.sender }, event);
+    await handleMenuButton(
+      {
+        client: this.client,
+        sender: this.sender,
+        performKeyboardAction: (action) => this.performKeyboardAction(action),
+      },
+      event,
+    );
+  }
+
+  private async performKeyboardAction(action: KeyboardAction): Promise<void> {
+    const peerId = this.lastOwnerPeerId;
+    if (peerId === null) {
+      return;
+    }
+    if (action.kind === "back") {
+      setView(peerId, "main");
+      await this.sender.sendText(peerId, t("vk.menu_main_hint"), { mainKeyboard: true });
+      return;
+    }
+    if (action.kind === "resume-session") {
+      setView(peerId, "main");
+      const { setCurrentSession } = await import("../app/services/session-service.js");
+      setCurrentSession({ id: action.id, title: action.title, directory: action.directory });
+      await this.sender.sendText(peerId, t("vk.session_resumed", { title: action.title }), {
+        mainKeyboard: true,
+      });
+      return;
+    }
+    if (action.kind === "switch-project") {
+      setView(peerId, "main");
+      const { setCurrentProject } = await import("../app/stores/settings-store.js");
+      const { getProjects } = await import("../app/services/project-service.js");
+      const projects = await getProjects();
+      const full = projects.find((project) => project.id === action.id);
+      if (!full) {
+        return;
+      }
+      setCurrentProject(full);
+      const { clearSession } = await import("../app/services/session-service.js");
+      clearSession();
+      await this.sender.sendText(peerId, t("vk.project_switched", { project: action.name }), {
+        mainKeyboard: true,
+      });
+      return;
+    }
+    if (action.kind === "switch-model") {
+      setView(peerId, "main");
+      const { selectModel } = await import("../app/services/model-selection-service.js");
+      selectModel({ providerID: action.providerID, modelID: action.modelID });
+      await this.sender.sendText(peerId, t("vk.model_switched", { model: action.label }), {
+        mainKeyboard: true,
+      });
+    }
   }
 
   private startStatusRun(sessionId: string, peerId: number): void {

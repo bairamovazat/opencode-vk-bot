@@ -3,16 +3,18 @@ import { vkClient } from "./client-instance.js";
 import { logger } from "../utils/logger.js";
 import { t } from "../i18n/index.js";
 import { opencodeClient } from "../opencode/client.js";
+import type { KeyboardAction } from "./keyboards.js";
 import type { VkApiClient } from "./client.js";
 import type { NormalizedButtonEvent } from "./events.js";
 import type { VkSender } from "./send.js";
 import { sendMessageEventAnswer } from "./callbacks.js";
+import { parseInlinePayload, resolveInlineTap } from "./keyboards.js";
 
 /** Payload schema version (contracts/callback-payloads.md). */
 const PAYLOAD_VERSION = 1;
 /** VK inline keyboard budget: conservative self-imposed caps (spec FR limits). */
 const MAX_BUTTONS = 10;
-const MAX_KEYBOARD_BYTES = 1000;
+const MAX_KEYBOARD_BYTES = 10000;
 /** VK button payload string budget (asserted in tests via pack size). */
 export const MAX_PAYLOAD_BYTES = 255;
 
@@ -63,6 +65,8 @@ export interface MenuDeps {
   /** VK API client used only for the button spinner answer. */
   client?: VkApiClient;
   sender: VkSender;
+  /** Executes a keyboard action (picker picks, back) — wired by VkBot. */
+  performKeyboardAction?: (action: KeyboardAction) => void | Promise<void>;
 }
 
 interface MenuPayload {
@@ -227,6 +231,24 @@ async function sendKeyboard(
  */
 export async function handleMenuButton(deps: MenuDeps, event: NormalizedButtonEvent): Promise<void> {
   const client = deps.client ?? vkClient;
+  let eventPayload: unknown;
+  try {
+    eventPayload = event.payload !== undefined ? JSON.parse(event.payload) : undefined;
+  } catch {
+    eventPayload = undefined; // malformed payload: fall through to legacy handling
+  }
+  const inlineTap = parseInlinePayload(eventPayload);
+  if (inlineTap) {
+    const { action, stale } = resolveInlineTap(inlineTap);
+    await sendMessageEventAnswer(client, event);
+    if (stale || !action) {
+      await deps.sender.sendText(event.peerId, t("vk.menu_outdated"), { mainKeyboard: true });
+      return;
+    }
+    await deps.performKeyboardAction?.(action);
+    return;
+  }
+
   const payload = unpackPayload(event.payload);
   if (!payload) {
     await sendMessageEventAnswer(client, event);

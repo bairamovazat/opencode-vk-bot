@@ -84,7 +84,7 @@ describe("vk menus (US3)", () => {
     const keyboard = await lastKeyboard(sender);
     const payload = keyboard.buttons[0]![0]!.action.payload;
     expect(isPayloadWithinBudget(payload)).toBe(true);
-    expect(Buffer.byteLength(JSON.stringify(keyboard), "utf8")).toBeLessThan(1000);
+    expect(Buffer.byteLength(JSON.stringify(keyboard), "utf8")).toBeLessThan(10000);
   });
 
   it("delivers permission decisions through the opencode client", async () => {

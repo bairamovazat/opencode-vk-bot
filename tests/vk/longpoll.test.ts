@@ -170,7 +170,7 @@ describe("vk long poll", () => {
       ],
       (update) => {
         calls += 1;
-        if (calls === 1) {
+        if (calls <= 2) {
           throw new Error("handler boom");
         }
         void update;
@@ -179,9 +179,12 @@ describe("vk long poll", () => {
 
     await runUntilIdle(harness.longPoll);
 
-    expect(harness.updates).toEqual([UPDATE_A, UPDATE_A]);
-    expect(harness.requestedUrls[1]).toContain("ts=100");
-    expect(harness.savedTs).toEqual(["602"]);
+    // The failing handler is retried with backoff until it succeeds; ts
+    // stays untouched during failures (redelivery) and advances afterwards.
+    // 2 failed attempts + 1 success in batch 1, then the redelivered event
+    // succeeds in batch 2: the event is observed 4 times in total.
+    expect(harness.updates).toEqual([UPDATE_A, UPDATE_A, UPDATE_A, UPDATE_A]);
+    expect(harness.savedTs).toEqual(["601", "602"]);
   });
 
   it("stops without further requests once aborted", async () => {

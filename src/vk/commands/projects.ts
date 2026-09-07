@@ -2,8 +2,9 @@ import { getProjects } from "../../app/services/project-service.js";
 import { t } from "../../i18n/index.js";
 import type { VkSender } from "../send.js";
 import {
-  buildPickerKeyboard,
+  buildInlinePickerKeyboard,
   isKeyboardWithinBudget,
+  registerPicker,
   setView,
   type PickerOption,
 } from "../keyboards.js";
@@ -23,7 +24,8 @@ export async function handleProjectsCommand(sender: VkSender, peerId: number): P
 
   setView(peerId, "projects", options);
 
-  const keyboard = buildPickerKeyboard(options);
+  const menuId = registerPicker("projects", options);
+  const keyboard = buildInlinePickerKeyboard(menuId, options);
   const textFallback =
     t("vk.projects_header") + "\n" + options.map((o, i) => `${i + 1}. ${o.label}`).join("\n");
   if (isKeyboardWithinBudget(keyboard)) {

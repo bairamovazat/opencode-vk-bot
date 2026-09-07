@@ -4,8 +4,9 @@ import { logger } from "../../utils/logger.js";
 import { t } from "../../i18n/index.js";
 import type { VkSender } from "../send.js";
 import {
-  buildPickerKeyboard,
+  buildInlinePickerKeyboard,
   isKeyboardWithinBudget,
+  registerPicker,
   setView,
   type PickerOption,
 } from "../keyboards.js";
@@ -40,7 +41,8 @@ export async function handleSessionsCommand(sender: VkSender, peerId: number): P
   logger.info(`[VkBot] /sessions: ${options.length} session(s) for ${project.worktree}`);
   setView(peerId, "sessions", options);
 
-  const keyboard = buildPickerKeyboard(options);
+  const menuId = registerPicker("sessions", options);
+  const keyboard = buildInlinePickerKeyboard(menuId, options);
   const textFallback =
     t("vk.sessions_header") + "\n" + options.map((o, i) => `${i + 1}. ${o.label}`).join("\n");
   if (isKeyboardWithinBudget(keyboard)) {

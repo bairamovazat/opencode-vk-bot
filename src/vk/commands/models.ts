@@ -3,8 +3,9 @@ import { logger } from "../../utils/logger.js";
 import { t } from "../../i18n/index.js";
 import type { VkSender } from "../send.js";
 import {
-  buildPickerKeyboard,
+  buildInlinePickerKeyboard,
   isKeyboardWithinBudget,
+  registerPicker,
   setView,
   type PickerOption,
 } from "../keyboards.js";
@@ -37,7 +38,8 @@ export async function handleModelsCommand(sender: VkSender, peerId: number): Pro
   logger.info(`[VkBot] /models: ${options.length} model(s) listed`);
   setView(peerId, "models", options);
 
-  const keyboard = buildPickerKeyboard(options);
+  const menuId = registerPicker("models", options);
+  const keyboard = buildInlinePickerKeyboard(menuId, options);
   const textFallback =
     t("vk.models_header") + "\n" + options.map((o, i) => `${i + 1}. ${o.label}`).join("\n");
   if (isKeyboardWithinBudget(keyboard)) {

@@ -1,16 +1,15 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
+  buildInlinePickerKeyboard,
   buildMainReplyKeyboard,
-  buildPickerKeyboard,
   buildRunKeyboard,
   isKeyboardWithinBudget,
+  parseInlinePayload,
+  registerPicker,
   resolveButtonText,
-  resolveKeyboardTap,
-  setView,
+  resolveInlineTap,
   type PickerOption,
 } from "../../src/vk/keyboards.js";
-
-const PEER = 2000000042;
 
 function sessionOption(title: string, id = `ses-${title}`): PickerOption {
   return {
@@ -18,69 +17,6 @@ function sessionOption(title: string, id = `ses-${title}`): PickerOption {
     action: { kind: "resume-session", id, title, directory: "/repo" },
   };
 }
-
-describe("keyboard view store", () => {
-  beforeEach(() => {
-    // Fresh store per test: default view is main.
-    setView(PEER, "main", []);
-  });
-
-  it("defaults to the main view with no options", () => {
-    const view = resolveKeyboardTap(PEER + 1, "что-то своё");
-    expect(view.kind).toBe("passthrough");
-  });
-
-  it("opens a picker view and resolves taps by stored identity", () => {
-    setView(PEER, "sessions", [sessionOption("Моя задача")]);
-
-    const resolution = resolveKeyboardTap(PEER, "Моя задача");
-
-    expect(resolution.kind).toBe("action");
-    expect(resolution.action).toMatchObject({
-      kind: "resume-session",
-      id: "ses-Моя задача",
-    });
-  });
-
-  it("resolves identical labels to distinct stored identities (SC-103)", () => {
-    setView(PEER, "sessions", [sessionOption("Same", "ses-a"), sessionOption("Same", "ses-b")]);
-
-    const first = resolveKeyboardTap(PEER, "Same");
-    expect(first.action).toMatchObject({ id: "ses-a" });
-  });
-
-  it("returns to main on the back label", () => {
-    setView(PEER, "projects", [
-      { label: "repo", action: { kind: "switch-project", id: "p1", name: "repo" } },
-    ]);
-
-    const resolution = resolveKeyboardTap(PEER, "⬅️ Меню");
-
-    expect(resolution.kind).toBe("action");
-    expect(resolution.action).toMatchObject({ kind: "back" });
-    // Following free text is a passthrough at main.
-    expect(resolveKeyboardTap(PEER, "свободный текст").kind).toBe("passthrough");
-  });
-
-  it("resets to main and passes free text typed inside a picker (FR-107)", () => {
-    setView(PEER, "models", [
-      {
-        label: "zai/glm",
-        action: { kind: "switch-model", providerID: "zai", modelID: "glm", label: "zai/glm" },
-      },
-    ]);
-
-    const resolution = resolveKeyboardTap(PEER, "напиши стихи");
-
-    expect(resolution.kind).toBe("passthrough");
-  });
-
-  it("ignores main-view taps in main view (labels are handled by the router)", () => {
-    setView(PEER, "main", []);
-
-    expect(resolveKeyboardTap(PEER, "📊 Статус").kind).toBe("passthrough");
-  });
-});
 
 describe("keyboard builders", () => {
   it("main keyboard is within budget and holds the documented buttons", () => {
@@ -104,11 +40,13 @@ describe("keyboard builders", () => {
     expect(labels).toEqual(["⏹ Стоп", "📊 Статус", "🏠 Меню"]);
   });
 
-  it("picker keyboard appends the back button and truncates at 10 options", () => {
+  it("inline picker stays within the verified 6-row limit (5 options + back)", () => {
     const options = Array.from({ length: 14 }, (_, i) => sessionOption(`s${i}`, `id-${i}`));
-    const keyboard = buildPickerKeyboard(options);
+    const menuId = registerPicker("sessions", options);
+    const keyboard = buildInlinePickerKeyboard(menuId, options);
 
-    expect(keyboard.buttons).toHaveLength(11); // 10 options + back
+    // Verified live: 7+ rows trigger VK API error 911.
+    expect(keyboard.buttons).toHaveLength(6);
     expect(keyboard.buttons.at(-1)![0]!.action.label).toBe("⬅️ Меню");
     expect(isKeyboardWithinBudget(keyboard)).toBe(true);
   });
@@ -117,5 +55,59 @@ describe("keyboard builders", () => {
     expect(resolveButtonText("🆕 Новая")).toBe("/new");
     expect(resolveButtonText("⏹ Стоп")).toBe("/abort");
     expect(resolveButtonText("обычный текст")).toBe("обычный текст");
+  });
+});
+
+describe("inline tap resolution", () => {
+  it("resolves taps by stored identity, not by label (SC-103)", () => {
+    const options = [sessionOption("Same", "ses-a"), sessionOption("Same", "ses-b")];
+    const menuId = registerPicker("sessions", options);
+
+    const second = buildInlinePickerKeyboard(menuId, options).buttons[1]![0]!.action;
+    void second;
+    const tap = parseInlinePayload(
+      JSON.parse(
+        (buildInlinePickerKeyboard(menuId, options).buttons[1]![0]!.action as { payload: string })
+          .payload,
+      ),
+    );
+    expect(tap).not.toBeNull();
+
+    // Re-register a fresh menu where option 0 has a different id.
+    const freshId = registerPicker("sessions", [sessionOption("Same", "ses-c")]);
+    void freshId;
+    void tap;
+    const menuId2 = registerPicker("sessions", options);
+    const resolution = resolveInlineTap({
+      menuId: menuId2,
+      index: 1,
+      kind: "pick",
+    });
+    expect(resolution.stale).toBe(false);
+    expect(resolution.action).toMatchObject({ id: "ses-b" });
+  });
+
+  it("marks unknown menu ids as stale", () => {
+    const resolution = resolveInlineTap({ menuId: "m-missing", index: 0, kind: "pick" });
+    expect(resolution.stale).toBe(true);
+  });
+
+  it("back tap removes the menu and returns a back action", () => {
+    const menuId = registerPicker("sessions", [sessionOption("x")]);
+    const tap = parseInlinePayload(
+      JSON.parse((buildInlinePickerKeyboard(menuId, [sessionOption("x")]).buttons[1]![0]!.action as { payload: string }).payload),
+    );
+    expect(tap?.kind).toBe("back");
+
+    const resolution = resolveInlineTap(tap!);
+    expect(resolution.action).toMatchObject({ kind: "back" });
+    // Second tap on the same menu is stale (resolved menus are removed).
+    expect(resolveInlineTap(tap!).stale).toBe(true);
+  });
+
+  it("rejects malformed payloads", () => {
+    expect(parseInlinePayload("nope")).toBeNull();
+    expect(parseInlinePayload({ v: 2, k: "pick", m: "m1", x: 0 })).toBeNull();
+    expect(parseInlinePayload({ v: 1, k: "pick", m: "m1", x: -1 })).toBeNull();
   });
 });

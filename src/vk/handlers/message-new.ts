@@ -15,7 +15,6 @@ import { getStoredModel } from "../../app/services/model-selection-service.js";
 import { foregroundSessionState } from "../../app/managers/foreground-session-state-manager.js";
 import { safeBackgroundTask } from "../../utils/safe-background-task.js";
 import { isSttConfigured, transcribeAudio } from "../../app/services/stt-service.js";
-import { selectModel } from "../../app/services/model-selection-service.js";
 import { formatErrorDetails } from "../../utils/error-format.js";
 import { logger } from "../../utils/logger.js";
 import { isRecord } from "../../utils/type-guards.js";
@@ -24,7 +23,7 @@ import type { VkMessage } from "../types.js";
 import type { VkSender } from "../send.js";
 import type { VkRunCollector } from "../run-collector.js";
 import { handleCommandIfRequested } from "../commands/router.js";
-import { resolveKeyboardTap, type KeyboardAction } from "../keyboards.js";
+
 
 const PROJECT_AUTO_SELECT_LOG = "[VkBot] No project selected: auto-selecting the first project";
 
@@ -48,12 +47,6 @@ export async function handleOwnerTextMessage(
   deps: VkMessageHandlerDeps,
 ): Promise<void> {
   const { sender, runCollector, peerId } = deps;
-
-  const tap = resolveKeyboardTap(peerId, message.text);
-  if (tap.kind === "action" && tap.action) {
-    await performKeyboardAction(tap.action, deps);
-    return;
-  }
 
   const command = await handleCommandIfRequested(message, {
     sender,
@@ -303,47 +296,6 @@ async function downloadLimited(url: string, maxBytes: number): Promise<Buffer | 
 /**
  * Executes a resolved keyboard tap (US2/US3 pickers, back to main menu).
  */
-async function performKeyboardAction(
-  action: KeyboardAction,
-  deps: VkMessageHandlerDeps,
-): Promise<void> {
-  const { sender, peerId } = deps;
-
-  if (action.kind === "back") {
-    await sender.sendText(peerId, t("vk.menu_main_hint"), { mainKeyboard: true });
-    return;
-  }
-
-  if (action.kind === "resume-session") {
-    setCurrentSession({ id: action.id, title: action.title, directory: action.directory });
-    await sender.sendText(peerId, t("vk.session_resumed", { title: action.title }), {
-      mainKeyboard: true,
-    });
-    return;
-  }
-
-  if (action.kind === "switch-project") {
-    const projects = await getProjects();
-    const full = projects.find((project) => project.id === action.id);
-    if (!full) {
-      await sender.sendText(peerId, t("error.generic"));
-      return;
-    }
-    setCurrentProject(full);
-    clearSession();
-    await sender.sendText(peerId, t("vk.project_switched", { project: action.name }), {
-      mainKeyboard: true,
-    });
-    return;
-  }
-
-  if (action.kind === "switch-model") {
-    selectModel({ providerID: action.providerID, modelID: action.modelID });
-    await sender.sendText(peerId, t("vk.model_switched", { model: action.label }), {
-      mainKeyboard: true,
-    });
-  }
-}
 
 /**
  * Voice input (US8): VK often carries its own transcript inside
