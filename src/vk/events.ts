@@ -156,8 +156,13 @@ export class VkEventNormalizer {
       peerId: event.peer_id,
       eventId: event.event_id,
     };
+    // Long Poll delivers the payload already parsed (impl-notes); the
+    // callback API delivers a JSON string. Normalize to a string so the
+    // downstream tap parsing has a single shape (FR-111).
     if (typeof event.payload === "string") {
       button.payload = event.payload;
+    } else if (isRecord(event.payload)) {
+      button.payload = JSON.stringify(event.payload);
     }
     if (typeof event.conversation_message_id === "number") {
       button.conversationMessageId = event.conversation_message_id;

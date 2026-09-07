@@ -38,8 +38,10 @@ export class VkStatusRun {
     this.sleep = options.sleep ?? ((ms) => new Promise<void>((r) => setTimeout(r, ms)));
   }
 
-  async start(): Promise<void> {
-    await this.enqueueRender(t("vk.status_running", { count: 0 }));
+  /** Sends the first status line; pass the current activity text to render
+   * it immediately instead of a generic placeholder. */
+  async start(text: string = t("vk.status_running", { count: 0 })): Promise<void> {
+    await this.enqueueRender(text);
   }
 
   private enqueueRender(text: string): Promise<void> {

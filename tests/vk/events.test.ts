@@ -49,7 +49,7 @@ describe("event normalizer", () => {
       object: { user_id: 42, peer_id: 2000000042, event_id: "be1", payload: '{"k":"prm"}', conversation_message_id: 9 },
     };
 
-    const event = normalizer.normalize(update);
+    const event = eventOrThrow(normalizer.normalize(update));
 
     expect(event).toMatchObject({
       kind: "button",
@@ -58,6 +58,27 @@ describe("event normalizer", () => {
       eventId: "be1",
       payload: '{"k":"prm"}',
       conversationMessageId: 9,
+    });
+  });
+
+  it("normalizes Long Poll object payloads into JSON strings (FR-111)", () => {
+    const normalizer = new VkEventNormalizer(OPTIONS);
+    const update = {
+      type: "message_event",
+      group_id: 12345,
+      object: {
+        user_id: 42,
+        peer_id: 2000000042,
+        event_id: "be2",
+        payload: { v: 1, k: "pick", m: "m1", x: 2 },
+      },
+    };
+
+    const event = eventOrThrow(normalizer.normalize(update));
+
+    expect(event).toMatchObject({
+      kind: "button",
+      payload: '{"v":1,"k":"pick","m":"m1","x":2}',
     });
   });
 

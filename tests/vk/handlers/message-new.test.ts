@@ -126,7 +126,7 @@ describe("vk message-new handler (US1)", () => {
     await handleOwnerTextMessage(ownerMessage("привет"), { sender, runCollector, peerId: PEER });
 
     expect(mocks.setCurrentProject).toHaveBeenCalledWith(PROJECT);
-    expect(sender.sendText).toHaveBeenCalledWith(PEER, expect.stringContaining("Creating a new session"));
+    expect(sender.sendText).toHaveBeenCalledWith(PEER, expect.stringContaining("Creating a new session"), { mainKeyboard: true });
   });
 
   it("creates a session, subscribes the collector and dispatches promptAsync", async () => {
@@ -142,7 +142,7 @@ describe("vk message-new handler (US1)", () => {
     expect(promptArgs.directory).toBe("/repo");
     expect(promptArgs.parts).toEqual([{ type: "text", text: "сделай фичу" }]);
     expect(promptArgs.model).toEqual({ providerID: "anthropic", modelID: "claude" });
-    expect(sender.sendText).toHaveBeenCalledWith(PEER, expect.stringContaining("Creating a new session"));
+    expect(sender.sendText).toHaveBeenCalledWith(PEER, expect.stringContaining("Creating a new session"), { mainKeyboard: true });
   });
 
   it("rejects a prompt with a busy notice when the session is busy", async () => {
@@ -158,7 +158,7 @@ describe("vk message-new handler (US1)", () => {
 
     expect(runCollector.begin).not.toHaveBeenCalled();
     expect(mocks.sessionPromptAsync).not.toHaveBeenCalled();
-    expect(sender.sendText).toHaveBeenCalledWith(PEER, expect.any(String));
+    expect(sender.sendText).toHaveBeenCalledWith(PEER, expect.any(String), { mainKeyboard: true });
     const sent = (sender.sendText as ReturnType<typeof vi.fn>).mock.calls[0]![1] as string;
     expect(sent.toLowerCase()).toContain("already running");
   });

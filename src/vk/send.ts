@@ -155,10 +155,13 @@ export class VkSender {
         "messages.send",
         params,
       );
-      if (typeof response === "number") {
-        return response;
-      }
-      return typeof response.message_id === "number" ? response.message_id : null;
+      const messageId = typeof response === "number" ? response : response.message_id ?? null;
+      logger.debug("[VkSender] messages.send ok", {
+        peerId: params.peer_id,
+        messageId,
+        bytes: String(params.message ?? "").length,
+      });
+      return messageId;
     } catch (error) {
       const code = error instanceof VkApiError ? error.code : undefined;
       // Keyboard rejected (bot features disabled in community settings):

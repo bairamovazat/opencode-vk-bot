@@ -9,6 +9,7 @@ import { handleHelpCommand } from "./help.js";
 import { resolveButtonText, setView } from "../keyboards.js";
 import { handleProjectsCommand } from "./projects.js";
 import { handleModelsCommand } from "./models.js";
+import { t } from "../../i18n/index.js";
 
 export interface CommandDeps {
   sender: VkSender;
@@ -47,12 +48,19 @@ export async function handleCommandIfRequested(
   switch (command.name) {
     case "abort":
     case "stop": {
-      const outcome = await handleAbortIfRequested(message.text, sender, peerId);
+      // Pass the resolved command, never the raw label: keyboard labels
+      // (e.g. «⏹ Стоп») would not match the abort command set and the
+      // message would leak to the agent as a prompt (FR-112).
+      const outcome = await handleAbortIfRequested(`/${command.name}`, sender, peerId);
       if (outcome.handled) {
-        const { getCurrentSession } = await import("../../app/services/session-service.js");
-        const active = getCurrentSession();
-        if (active) {
-          deps.onAborted?.(active.id);
+        // Only a real abort may register the session for error suppression:
+        // an idle no-op or failed attempt must not swallow future errors.
+        if (outcome.aborted) {
+          const { getCurrentSession } = await import("../../app/services/session-service.js");
+          const active = getCurrentSession();
+          if (active) {
+            deps.onAborted?.(active.id);
+          }
         }
         setView(peerId, "main");
       }
@@ -75,6 +83,11 @@ export async function handleCommandIfRequested(
       return true;
     case "models":
       await handleModelsCommand(sender, peerId);
+      return true;
+    case "menu":
+      // Run-view «🏠 Меню»: return to the main keyboard (FR-112).
+      setView(peerId, "main");
+      await sender.sendText(peerId, t("vk.menu_main_hint"), { mainKeyboard: true });
       return true;
     case "help":
     case "start":

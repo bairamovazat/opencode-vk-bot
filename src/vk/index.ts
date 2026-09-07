@@ -13,7 +13,9 @@ import { buildPermissionMenu, buildQuestionMenu } from "./menus.js";
 import { buildRunKeyboard, setView, type KeyboardAction } from "./keyboards.js";
 import { VkStatusRun } from "./status.js";
 import { handleOwnerTextMessage, type VkMessageHandlerDeps } from "./handlers/message-new.js";
-import { markSessionAborted } from "./commands/abort.js";
+import { handleSessionsCommand } from "./commands/sessions.js";
+import { handleProjectsCommand } from "./commands/projects.js";
+import { handleModelsCommand } from "./commands/models.js";
 import { renderMarkdownToPlainText } from "./render/pipeline.js";
 import { config } from "../config.js";
 import { logger } from "../utils/logger.js";
@@ -75,7 +77,11 @@ export class VkBot {
     this.statusRun = null;
   }
 
-  private async handleUpdate(update: unknown): Promise<void> {
+  /**
+   * Entry point for one raw Long Poll update. Public so the E2E flow tests
+   * can drive the full pipeline (tests/vk/flows.e2e.test.ts).
+   */
+  async handleUpdate(update: unknown): Promise<void> {
     logger.debug(
       `[VkBot] update: ${JSON.stringify(update).slice(0, 300)}`,
     );
@@ -94,7 +100,11 @@ export class VkBot {
           this.currentDirectory = directory;
           this.startStatusRun(sessionId, event.message.peer_id);
         },
-        onAborted: (sessionId) => markSessionAborted(sessionId),
+        onAborted: (sessionId) => {
+          // Owner-initiated abort: the follow-up session.error is expected
+          // noise and must be suppressed (F6.1).
+          this.abortedSessionIds.add(sessionId);
+        },
       };
       await handleOwnerTextMessage(event.message, deps);
       return;
@@ -104,28 +114,41 @@ export class VkBot {
   }
 
   /**
-   * Button taps arrive with US3; until then the spinner is cleared so the
-   * client does not hang, and the tap is otherwise ignored.
+   * Routes an inline button tap (pickers, permission/question menus)
+   * through menus.ts; spinner is always cleared (FR-108).
    */
   private async handleButtonEvent(event: NormalizedEvent & { kind: "button" }): Promise<void> {
     await handleMenuButton(
       {
         client: this.client,
         sender: this.sender,
-        performKeyboardAction: (action) => this.performKeyboardAction(action),
+        performKeyboardAction: (action) => this.performKeyboardAction(action, event.peerId),
       },
       event,
     );
   }
 
-  private async performKeyboardAction(action: KeyboardAction): Promise<void> {
-    const peerId = this.lastOwnerPeerId;
-    if (peerId === null) {
-      return;
-    }
+  /**
+   * Executes a resolved inline-tap action (F2–F5, F9). The peer comes from
+   * the button event itself, so taps work even right after a restart when
+   * no owner message has been seen yet (FR-111).
+   */
+  private async performKeyboardAction(action: KeyboardAction, peerId: number): Promise<void> {
     if (action.kind === "back") {
       setView(peerId, "main");
       await this.sender.sendText(peerId, t("vk.menu_main_hint"), { mainKeyboard: true });
+      return;
+    }
+    if (action.kind === "page") {
+      // Pagination re-renders the picker as a fresh message with fresh
+      // data; sendPickerView clamps the page to the available range.
+      if (action.view === "sessions") {
+        await handleSessionsCommand(this.sender, peerId, action.page);
+      } else if (action.view === "projects") {
+        await handleProjectsCommand(this.sender, peerId, action.page);
+      } else if (action.view === "models") {
+        await handleModelsCommand(this.sender, peerId, action.page);
+      }
       return;
     }
     if (action.kind === "resume-session") {
@@ -144,6 +167,8 @@ export class VkBot {
       const projects = await getProjects();
       const full = projects.find((project) => project.id === action.id);
       if (!full) {
+        // Project vanished between render and tap: stale tap (FR-108).
+        await this.sender.sendText(peerId, t("vk.menu_outdated"), { mainKeyboard: true });
         return;
       }
       setCurrentProject(full);
@@ -167,8 +192,10 @@ export class VkBot {
   private startStatusRun(sessionId: string, peerId: number): void {
     void sessionId;
     setView(peerId, "run");
+    // Silent (FR-114): during a run only the final reply may notify.
     void this.sender.sendText(peerId, t("vk.run_started"), {
       keyboard: buildRunKeyboard(),
+      silent: true,
     });
   }
 
@@ -210,14 +237,26 @@ export class VkBot {
   }
 
   private async reportActivity(activity: ToolActivity): Promise<void> {
+    // Live progress line (FR-115): the current tool (+ optional detail like
+    // the edited file) and the action count, so the owner can see the run
+    // is alive and what it is doing right now.
+    const detail = [activity.lastTool, activity.detail].filter((part): part is string =>
+      typeof part === "string" && part.length > 0,
+    );
+    const text =
+      detail.length > 0
+        ? t("vk.status_running_tool", { tool: detail.join(" · "), count: activity.toolCount })
+        : t("vk.status_running", { count: activity.toolCount });
     if (!this.statusRun) {
       this.statusRun = new VkStatusRun({
         client: this.client,
         peerId: this.lastOwnerPeerId ?? config.vk.allowedUserId,
       });
-      await this.statusRun.start();
+      // Render the first activity immediately (no throttle wait).
+      await this.statusRun.start(text);
+      return;
     }
-    await this.statusRun.setActivity(t("vk.status_running", { count: activity.toolCount }));
+    await this.statusRun.setActivity(text);
   }
 
   private async deliverRunResult(result: RunResult): Promise<void> {
@@ -232,7 +271,10 @@ export class VkBot {
 
     const text = renderMarkdownToPlainText(result.text);
     if (text.length === 0) {
-      logger.info("[VkBot] Run finished with empty assistant text; nothing to deliver");
+      // No assistant text: still return the main keyboard so the reply
+      // keyboard does not stay in the run view (F0.4).
+      logger.info("[VkBot] Run finished with empty assistant text");
+      await this.sender.sendText(peerId, t("vk.run_finished_empty"), { mainKeyboard: true });
       return;
     }
 

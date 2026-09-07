@@ -8,7 +8,7 @@ import type { VkApiClient } from "./client.js";
 import type { NormalizedButtonEvent } from "./events.js";
 import type { VkSender } from "./send.js";
 import { sendMessageEventAnswer } from "./callbacks.js";
-import { parseInlinePayload, resolveInlineTap } from "./keyboards.js";
+import { parseInlinePayload, resolveInlineTap, peekPickerMessages } from "./keyboards.js";
 
 /** Payload schema version (contracts/callback-payloads.md). */
 const PAYLOAD_VERSION = 1;
@@ -24,6 +24,8 @@ export interface PermissionMenuData {
   directory: string;
   tool: string;
   patterns: string[];
+  /** Message carrying the keyboard; removed once the tap is handled (FR-116). */
+  messageIds?: number[];
 }
 
 export interface QuestionMenuData {
@@ -37,6 +39,8 @@ export interface QuestionMenuData {
   }>;
   currentIndex: number;
   answers: Array<string[]>;
+  /** Message of the CURRENT question; removed when it is answered (FR-116). */
+  messageIds?: number[];
 }
 
 export interface ProjectsMenuData {
@@ -167,7 +171,7 @@ export async function buildPermissionMenu(
 
   const patterns = data.patterns.length > 0 ? ` (${data.patterns.join(", ")})` : "";
   const text = t("vk.perm_asked", { tool: data.tool }) + patterns;
-  await sendKeyboard(deps, peerId, text, keyboard, menu);
+  menu.messageIds = await sendKeyboard(deps, peerId, text, keyboard, menu);
 }
 
 export async function buildQuestionMenu(
@@ -202,7 +206,14 @@ async function showQuestion(
     },
   ]);
   const keyboard = { inline: true, buttons: rows };
-  await sendKeyboard({ sender }, peerId, `❓ ${question.header || question.question}`, keyboard, menu);
+  // Show BOTH the short header and the full question text (F10) — the
+  // header alone often hides what is actually being asked.
+  const headerLine = question.header ? `❓ ${question.header}` : t("vk.question_fallback");
+  const text =
+    question.question && question.question !== question.header
+      ? `${headerLine}\n${question.question}`
+      : headerLine;
+  menu.messageIds = await sendKeyboard({ sender }, peerId, text, keyboard, menu);
 }
 
 async function sendKeyboard(
@@ -211,17 +222,34 @@ async function sendKeyboard(
   text: string,
   keyboard: unknown,
   menu: MenuData,
-): Promise<void> {
+): Promise<number[]> {
   const keyboardJson = JSON.stringify(keyboard);
   if (Buffer.byteLength(keyboardJson, "utf8") > MAX_KEYBOARD_BYTES) {
     logger.warn("[VkMenus] Keyboard JSON exceeds byte budget, dropping buttons", {
       bytes: Buffer.byteLength(keyboardJson, "utf8"),
     });
-    await deps.sender.sendText(peerId, text);
-    return;
+    return deps.sender.sendText(peerId, text);
   }
   void menu;
-  await deps.sender.sendText(peerId, text, { keyboard });
+  return deps.sender.sendText(peerId, text, { keyboard });
+}
+
+/** Best-effort removal of consumed menu messages (FR-116): dead inline
+ * buttons must not linger in the dialog looking tappable. */
+async function deleteBotMessages(
+  client: VkApiClient,
+  messageIds: number[],
+): Promise<void> {
+  for (const messageId of messageIds) {
+    try {
+      await client.call("messages.delete", {
+        message_ids: messageId,
+        delete_for_all: true,
+      });
+    } catch (error) {
+      logger.debug("[VkMenus] Menu message delete failed", { messageId, error });
+    }
+  }
 }
 
 /**
@@ -239,26 +267,38 @@ export async function handleMenuButton(deps: MenuDeps, event: NormalizedButtonEv
   }
   const inlineTap = parseInlinePayload(eventPayload);
   if (inlineTap) {
-    const { action, stale } = resolveInlineTap(inlineTap);
+    const { action, stale, messageIds } = resolveInlineTap(inlineTap);
     await sendMessageEventAnswer(client, event);
     if (stale || !action) {
       await deps.sender.sendText(event.peerId, t("vk.menu_outdated"), { mainKeyboard: true });
       return;
     }
+    if (action.kind === "page") {
+      // Paging keeps the tapped menu alive but replaces the previous page
+      // message so dead keyboards do not accumulate (FR-116).
+      const previousPageMessages = peekPickerMessages(inlineTap.menuId);
+      await deps.performKeyboardAction?.(action);
+      await deleteBotMessages(client, previousPageMessages);
+      return;
+    }
     await deps.performKeyboardAction?.(action);
+    await deleteBotMessages(client, messageIds);
     return;
   }
 
   const payload = unpackPayload(event.payload);
   if (!payload) {
+    // Unknown/garbage payload: still answer with the outdated-menu hint so
+    // no tap is ever silently ignored (FR-108).
     await sendMessageEventAnswer(client, event);
+    await deps.sender.sendText(event.peerId, t("vk.menu_outdated"), { mainKeyboard: true });
     return;
   }
 
   const menu = menus.get(payload.s);
   if (!menu) {
     await sendMessageEventAnswer(client, event);
-    await deps.sender.sendText(event.peerId, t("vk.menu_outdated"));
+    await deps.sender.sendText(event.peerId, t("vk.menu_outdated"), { mainKeyboard: true });
     return;
   }
 
@@ -289,6 +329,9 @@ async function resolvePermission(
   const reply = x === 1 ? "once" : x === 2 ? "always" : "reject";
   await sendMessageEventAnswer(client, event);
   resolveMenu(id);
+  // The permission prompt is one-shot: remove it so its buttons cannot be
+  // tapped again (FR-116).
+  await deleteBotMessages(client, menu.messageIds ?? []);
 
   try {
     const { error } = await opencodeClient.permission.reply({
@@ -334,11 +377,15 @@ async function pickQuestionOption(
 
   if (menu.currentIndex < menu.questions.length - 1) {
     menu.currentIndex += 1;
+    // Remove the answered question message before showing the next one so
+    // dead buttons do not pile up (FR-116).
+    await deleteBotMessages(client, menu.messageIds ?? []);
     await showQuestion(sender, event.peerId, id, menu);
     return;
   }
 
   resolveMenu(id);
+  await deleteBotMessages(client, menu.messageIds ?? []);
   try {
     const { error } = await opencodeClient.question.reply({
       requestID: menu.requestId,

@@ -10,6 +10,8 @@ export interface RunResult {
 export interface ToolActivity {
   toolCount: number;
   lastTool?: string;
+  /** Compact context of the last tool call (e.g. the edited file path). */
+  detail?: string;
 }
 
 export interface PermissionAsked {
@@ -57,6 +59,33 @@ interface RunState {
   messageRoles: Map<string, string>;
   /** Part keys proven to be `text` via part.updated (delta events may omit type). */
   knownTextParts: Set<string>;
+}
+
+/** Input keys that make a useful one-line "what is it doing" context. */
+const TOOL_DETAIL_KEYS = ["filePath", "path", "command", "description", "query", "url", "pattern"];
+const MAX_TOOL_DETAIL_LENGTH = 60;
+
+/**
+ * Compact context for the live status line: the most telling input of the
+ * tool call (edited file, command, query…), truncated. Returns undefined
+ * when the part carries nothing recognizable.
+ */
+function extractToolDetail(part: Record<string, unknown>): string | undefined {
+  const state = isRecord(part.state) ? part.state : null;
+  const input = state && isRecord(state.input) ? state.input : null;
+  if (!input) {
+    return undefined;
+  }
+  for (const key of TOOL_DETAIL_KEYS) {
+    const value = input[key];
+    if (typeof value === "string" && value.trim().length > 0) {
+      const compact = value.trim().replace(/\s+/g, " ");
+      return compact.length > MAX_TOOL_DETAIL_LENGTH
+        ? `${compact.slice(0, MAX_TOOL_DETAIL_LENGTH - 1)}…`
+        : compact;
+    }
+  }
+  return undefined;
 }
 
 /**
@@ -135,6 +164,10 @@ export class VkRunCollector {
         const activity: ToolActivity = { toolCount: this.toolCount };
         if (typeof part.tool === "string") {
           activity.lastTool = part.tool;
+        }
+        const detail = extractToolDetail(part);
+        if (detail) {
+          activity.detail = detail;
         }
         void this.deps.onActivity?.(activity);
         return;

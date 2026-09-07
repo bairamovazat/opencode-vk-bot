@@ -30,9 +30,18 @@ import {
 const PEER = 2000000042;
 
 function createDeps() {
-  const sender = { sendText: vi.fn(async () => [] as number[]) } as unknown as VkSender;
-  const client = {} as VkApiClient;
+  let nextMessageId = 700;
+  const sender = {
+    sendText: vi.fn(async () => [nextMessageId++]),
+  } as unknown as VkSender;
+  const client = { call: vi.fn(async () => 1) } as unknown as VkApiClient;
   return { sender, client };
+}
+
+function deleteCalls(client: VkApiClient): Array<{ messageId: number }> {
+  return (client.call as ReturnType<typeof vi.fn>).mock.calls
+    .filter(([method]) => method === "messages.delete")
+    .map(([, params]) => ({ messageId: Number((params as { message_ids: number }).message_ids) }));
 }
 
 function buttonEvent(payload?: string): NormalizedButtonEvent {
@@ -108,6 +117,8 @@ describe("vk menus (US3)", () => {
     });
     const sentTexts = (sender.sendText as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[1]);
     expect(sentTexts.some((text: string) => text.includes("Allowed once"))).toBe(true);
+    // One-shot prompt: its message (700) is removed after the decision (FR-116).
+    expect(deleteCalls(client)).toEqual([{ messageId: 700 }]);
   });
 
   it("treats a resolved menu tap as outdated", async () => {
@@ -154,9 +165,17 @@ describe("vk menus (US3)", () => {
       ],
     });
 
+    // The question message shows BOTH the header and the full question.
+    const firstTexts = (sender.sendText as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[1]);
+    expect(firstTexts.some((text: string) => text.includes("База данных"))).toBe(true);
+    expect(firstTexts.some((text: string) => text.includes("Какую БД?"))).toBe(true);
+
     const firstKeyboard = await lastKeyboard(sender);
     expect(firstKeyboard.buttons).toHaveLength(2);
     await handleMenuButton({ client, sender }, buttonEvent(firstKeyboard.buttons[0]![0]!.action.payload));
+
+    // The answered question message is removed before the next one shows.
+    expect(deleteCalls(client)).toEqual([{ messageId: 700 }]);
 
     const secondKeyboard = await lastKeyboard(sender);
     expect(secondKeyboard.buttons[0]![0]!.action.label).toBe("Vitest");
@@ -169,14 +188,16 @@ describe("vk menus (US3)", () => {
     });
     const sentTexts = (sender.sendText as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[1]);
     expect(sentTexts.some((text: string) => text.includes("delivered"))).toBe(true);
+    expect(deleteCalls(client)).toEqual([{ messageId: 700 }, { messageId: 701 }]);
   });
 
-  it("answers unknown payloads with only a spinner clear", async () => {
+  it("answers unknown payloads with a spinner clear and the outdated hint (FR-108)", async () => {
     const { sender, client } = createDeps();
 
     await handleMenuButton({ client, sender }, buttonEvent("not-json"));
 
     expect(mocks.sendMessageEventAnswer).toHaveBeenCalled();
-    expect(sender.sendText).not.toHaveBeenCalled();
+    const sentTexts = (sender.sendText as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[1]);
+    expect(sentTexts.some((text: string) => text.includes("outdated"))).toBe(true);
   });
 });

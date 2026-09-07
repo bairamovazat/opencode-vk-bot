@@ -23,6 +23,7 @@ import type { VkMessage } from "../types.js";
 import type { VkSender } from "../send.js";
 import type { VkRunCollector } from "../run-collector.js";
 import { handleCommandIfRequested } from "../commands/router.js";
+import { isSessionBusy } from "../commands/abort.js";
 
 
 const PROJECT_AUTO_SELECT_LOG = "[VkBot] No project selected: auto-selecting the first project";
@@ -99,12 +100,12 @@ export async function handleOwnerTextMessage(
     }
 
     if (!session) {
-      await sender.sendText(peerId, t("bot.creating_session"));
+      await sender.sendText(peerId, t("bot.creating_session"), { mainKeyboard: true });
       const { data: created, error } = await opencodeClient.session.create({
         directory: project.worktree,
       });
       if (error || !created) {
-        await sender.sendText(peerId, t("bot.create_session_error"));
+        await sender.sendText(peerId, t("bot.create_session_error"), { mainKeyboard: true });
         return;
       }
       session = {
@@ -117,9 +118,8 @@ export async function handleOwnerTextMessage(
       logger.info(`[VkBot] Created session ${session.id} for ${project.worktree}`);
     }
 
-    const busy = await isSessionBusy(session.id, session.directory);
-    if (busy) {
-      await sender.sendText(peerId, t("bot.session_busy"));
+    if ((await isSessionBusy(session.id, session.directory)) === "busy") {
+      await sender.sendText(peerId, t("bot.session_busy"), { mainKeyboard: true });
       return;
     }
 
@@ -161,7 +161,7 @@ export async function handleOwnerTextMessage(
         if (error) {
           foregroundSessionState.markIdle(session.id);
           logger.error("[VkBot] session.promptAsync API error:", formatErrorDetails(error, 4000));
-          void sender.sendText(peerId, t("bot.prompt_send_error"));
+          void sender.sendText(peerId, t("bot.prompt_send_error"), { mainKeyboard: true });
           return;
         }
         logger.info("[VkBot] session.promptAsync accepted");
@@ -170,12 +170,12 @@ export async function handleOwnerTextMessage(
       onError: (error) => {
         foregroundSessionState.markIdle(session.id);
         logger.error("[VkBot] session.promptAsync failed:", error);
-        void sender.sendText(peerId, t("bot.prompt_send_error"));
+        void sender.sendText(peerId, t("bot.prompt_send_error"), { mainKeyboard: true });
       },
     });
   } catch (error) {
     logger.error("[VkBot] Unexpected failure in message handler:", error);
-    await sender.sendText(peerId, t("error.generic"));
+    await sender.sendText(peerId, t("error.generic"), { mainKeyboard: true });
   }
 }
 
@@ -197,7 +197,7 @@ async function ensureProjectSelected(
   const projects = await getProjects();
   const first = projects[0];
   if (!first) {
-    await sender.sendText(peerId, t("bot.project_not_selected"));
+    await sender.sendText(peerId, t("bot.project_not_selected"), { mainKeyboard: true });
     return null;
   }
 
@@ -377,20 +377,5 @@ async function downloadAndTranscribe(
   } catch (error) {
     logger.error("[VkBot] Voice transcription failed:", error);
     return null;
-  }
-}
-
-async function isSessionBusy(sessionId: string, directory: string): Promise<boolean> {
-  try {
-    const { data, error } = await opencodeClient.session.status({ directory });
-    if (error || !data) {
-      logger.warn("[VkBot] Failed to check session status before prompt:", error);
-      return false;
-    }
-    const status = (data as Record<string, { type?: string }>)[sessionId];
-    return status?.type === "busy";
-  } catch (error) {
-    logger.warn("[VkBot] Error checking session status:", error);
-    return false;
   }
 }

@@ -4,177 +4,287 @@
 
 **Created**: 2026-09-07
 
-**Status**: Draft
+**Status**: Active (iteration 2 — flows fixed after live bring-up failures)
 
 **Input**: User description: "Управлять ботом целиком через reply-клавиатуру: когда сессии нет — кнопка старт/меню; из меню — выбор сессии, начать новую, статус; нажал «Сессии» — выходит клавиатура с текущими сессиями, выбрал — сессия активна и можно вводить текст; плюс кнопки управления текущей сессией (стоп и другие — придумать). Спека, анализ, реализация."
 
-## User Scenarios & Testing *(mandatory)*
+## Interaction Model (platform facts, verified live)
 
-### User Story 1 - Main menu replaces command typing (Priority: P1)
+- There is exactly ONE **reply keyboard** per dialog at any time: either the
+  **main view** (3 rows) or the **run view** (1 row). The reply keyboard is
+  client-side state and never becomes a picker.
+- **Pickers** (sessions / projects / models / new-task project) are INLINE
+  button keyboards attached to a single message; taps arrive as
+  `message_event` with a payload object. They overlay whatever reply
+  keyboard is currently shown and disappear with the message context.
+- VK platform limits (verified by probes, see impl-notes.md): inline
+  keyboards accept at most **6 rows** → a picker shows **at most 5 option
+  rows + 1 nav row**; reply keyboards accept at most 6 rows too (main uses
+  3).
+- Button labels («🆕 Новая», «⏹ Стоп», …) are fixed Russian constants, not
+  localized (single-owner Russian-facing bot; FR-109 applies to message
+  texts only). Every label maps to exactly one action; a label must NEVER
+  leak to the agent as prompt text.
+- `message_event.payload` arrives from Long Poll as an **already parsed
+  object**; older code paths may still see JSON strings. Both shapes MUST
+  be accepted (FR-111).
 
-The owner always has a persistent keyboard under the message input with the
-main actions: start a new task, sessions, projects, models, status, help.
-Tapping a button performs the same action as the corresponding command; the
-keyboard never disappears — management actions are reachable without typing.
+## End-to-End Flows (normative)
 
-**Why this priority**: this is the core UX change; without the main menu
-nothing else in this feature matters.
+Each flow lists every step: user action → bot response (message + keyboard
+state). Every step must have a code path and an E2E test
+(tests/vk/flows.e2e.test.ts).
 
-**Independent Test**: open the dialog: the main keyboard is present; tap
-each button and verify the corresponding action happens without typing.
+### Keyboard views
 
-**Acceptance Scenarios**:
+- **Main view** (reply keyboard): rows
+  `[🆕 Новая, 📋 Сессии, 📊 Статус]`, `[📁 Проекты, 🤖 Модели, ⏹ Стоп]`,
+  `[❓ Помощь]`.
+- **Run view** (reply keyboard): row `[⏹ Стоп, 📊 Статус, 🏠 Меню]`.
+- Every picker message also shows a nav row as its last inline row:
+  «⬅️ Меню» when everything fits on one page, otherwise
+  «◀️ / ⬅️ Меню / ▶️» (only available directions).
 
-1. **Given** any dialog state, **When** the owner taps «🆕 Новая», **Then**
-   the current session binding is cleared and the confirmation is shown.
-2. **Given** the main keyboard, **When** the owner taps «📊 Статус»,
-   **Then** the status summary arrives and the keyboard remains.
-3. **Given** the owner types free text instead of tapping, **Then** the
-   text goes to the agent as a prompt (buttons never block typing).
+### F0 — First contact / baseline prompt loop
 
----
+1. Bot process starts; long poll connects. The bot sends nothing
+   proactively. (If the owner's client has no keyboard yet, any of F1–F7
+   replies attach the main view.)
+2. Owner sends any free text → if no project is selected, the first
+   project is auto-selected (single-owner convenience); a new session is
+   created in it («Создаю сессию…»), the prompt is dispatched.
+3. When the run starts, the bot sends «⚙️ Задача запущена…» SILENTLY (no
+   notification) with the **run view** (reply keyboard switches to run
+   view).
+4. While the run is active, a single silent live-status line is kept up to
+   date (throttled ≈3 s): «⏳ {tool} · действий: {count}» — the current
+   tool call with compact context (e.g. the edited file path) and the
+   action count, so the owner can see the run is alive and what it is
+   doing. The status line is deleted when the run ends.
+5. When the run finishes, the bot delivers the final text WITH a
+   notification — the only message of a run allowed to notify — with the
+   **main view** (reply keyboard switches back).
+6. If the run errors (and was not owner-aborted), the bot delivers an
+   error text with a notification and the main view.
 
-### User Story 2 - Session selection via keyboard (Priority: P1)
+### F1 — Help
 
-Tapping «📋 Сессии» replaces the keyboard with the recent-sessions view
-(one button per session plus «⬅️ Меню»). Tapping a session resumes it; the
-bot confirms and returns to the main keyboard; the owner can immediately
-type a task for the resumed session.
+1. Owner taps «❓ Помощь» (or types `/help`, `/start`) → help text with the
+   **main view** attached.
 
-**Why this priority**: resuming prior work without typing is the most
-frequent management action.
+### F2 — New task with project choice
 
-**Independent Test**: with ≥1 saved session, tap «📋 Сессии», tap a
-session button, then send a message that references the earlier context.
+1. Owner taps «🆕 Новая» (or types `/new`) → current session binding is
+   cleared immediately.
+2. If MORE than one project exists → the bot sends «🆕 Сессия сброшена.
+   Выбери проект для новой задачи:» with an inline **project picker**
+   (5 per page, see F3 pagination).
+   - Tap a project → the project becomes current, any session binding
+     stays cleared, bot confirms «✅ Проект переключён: {project}» with the
+     **main view**. The next free text creates a NEW session in that
+     project (continues as F0.2).
+   - Tap «⬅️ Меню» → bot confirms «🏠 Главное меню.» with the **main
+     view**.
+3. If zero or one project exists → the bot just confirms «🆕 Сессия
+   сброшена…» with the **main view** (project auto-selection will pick the
+   only project).
 
-**Acceptance Scenarios**:
+### F3 — Resume a session
 
-1. **Given** saved sessions exist, **When** the owner taps «📋 Сессии»,
-   **Then** the keyboard shows up to 10 session buttons and «⬅️ Меню».
-2. **Given** the sessions keyboard, **When** a session button is tapped,
-   **Then** the session becomes current, confirmation arrives, and the
-   main keyboard returns.
-3. **Given** the sessions view is open, **When** the owner types free text
-   instead of tapping, **Then** the text goes to the agent and the view
-   resets to the main keyboard.
+1. Owner taps «📋 Сессии» (or types `/sessions`) → if the current project
+   has sessions: header «Недавние сессии — нажми, чтобы продолжить:» plus a
+   status line «Всего: {total}» (when paging: «Всего: {total} · стр. {n}
+   из {m}»), with an inline picker showing page 1 — up to 5 sessions,
+   newest first. If none: «Сохранённых сессий пока нет.» (no picker).
+2. When more than 5 sessions exist, the bottom nav row holds «⬅️ Меню» and
+   «▶️» (page 1) or «◀️ / ⬅️ Меню / ▶️» (middle pages). Tapping «▶️»/«◀️»
+   renders the next/previous page as a fresh message (fresh data, new menu
+   id) and REMOVES the previous page message — dead keyboards do not pile
+   up. Out-of-range pages are clamped to the last available page.
+3. Tap a session → the session becomes current; bot confirms «✅ Сессия
+   продолжена: {title}» with the **main view** and REMOVES the picker
+   message, so its buttons can no longer be tapped. The next free text
+   prompts THAT session (F0 continues, no new session is created). Taps
+   resolve by stored identity, so the same title on different pages is
+   unambiguous.
+4. Tap «⬅️ Меню» → «🏠 Главное меню.» with the main view.
 
----
+### F4 — Switch project (management, not new-task)
 
-### User Story 3 - Projects and models pickers via keyboard (Priority: P2)
+1. Owner taps «📁 Проекты» (or types `/projects`) → inline project picker
+   (5 per page + nav row).
+2. Tap a project → project becomes current, session binding is cleared
+   (sessions are per-project), bot confirms «✅ Проект переключён:
+   {project}» with the main view. Next free text creates a session in the
+   new project.
+3. «⬅️ Меню» → main view hint (same as F2).
 
-«📁 Проекты» and «🤖 Модели» open corresponding pickers (buttons +
-«⬅️ Меню»). Tapping a project switches the working directory; tapping a
-model switches the model. Both return to the main keyboard with a
-confirmation.
+### F5 — Switch model
 
-**Why this priority**: same interaction pattern as US2, lower frequency.
+1. Owner taps «🤖 Модели» (or types `/models`) → inline model picker
+   (5 per page + nav row); if no models: «Доступных
+   моделей нет.»
+2. Tap a model → model is stored; bot confirms «✅ Модель переключена:
+   {model}» with the main view. Subsequent prompts use it.
+3. «⬅️ Меню» → main view hint.
 
-**Independent Test**: tap «📁 Проекты», pick a project, verify the
-confirmation; repeat for «🤖 Модели».
+### F6 — Stop a running task
 
-**Acceptance Scenarios**:
+1. Owner taps «⏹ Стоп» (in run view or main view; or types `/abort`,
+   `/stop`) → IF the bound session is actually running on the server, it
+   is aborted via the OpenCode API and the bot confirms «⏹ Задача
+   остановлена.» with the **main view**; the aborted session's follow-up
+   error event is suppressed.
+2. If nothing is running — no bound session, or the bound session is idle
+   on the server — the bot answers «Нет запущенной задачи.» with the main
+   view. Stop is IDEMPOTENT: pressing it repeatedly never claims to stop
+   something that is not running. When the server state cannot be checked,
+   the abort is attempted anyway (safe side).
+3. The label «⏹ Стоп» must never reach the agent as a prompt.
 
-1. **Given** several projects, **When** a project button is tapped,
-   **Then** the project is switched, persisted, and confirmed.
-2. **Given** the models picker, **When** a model button is tapped,
-   **Then** subsequent prompts use that model and a confirmation arrives.
+### F7 — Status
 
----
+1. Owner taps «📊 Статус» (or types `/status`) at ANY view → status report
+   (project, session, model, busy state) with the **main view**.
 
-### User Story 4 - Run controls while the agent works (Priority: P2)
+### F8 — Free text at any view
 
-While a task is running, the keyboard automatically switches to the run
-view: «⏹ Стоп», «📊 Статус», «🏠 Меню». «⏹ Стоп» aborts the run; the view
-returns to the main keyboard when the run ends (reply delivered or
-aborted).
+1. Owner sends non-command text at any view → it goes to the agent as a
+   prompt in the current session (creating one if needed); the reply
+   keyboard becomes the run view (F0.3). No prompt is ever lost to the
+   keyboard layer.
 
-**Why this priority**: stopping a runaway task without typing is a safety
-and convenience win; automatic view switching reflects the real state.
+### F9 — Stale / unknown taps (no dead ends)
 
-**Independent Test**: start a long task, verify the run keyboard appears,
-tap «⏹ Стоп», verify the abort notice and the return of the main keyboard
-with the final/aborted state.
+1. Owner taps an inline button of a picker that no longer exists (bot
+   restart, menu already used, >32 newer menus) → bot answers «Это меню
+   устарело. Запросите заново.» with the **main view**; no crash, no wrong
+   selection.
+2. A tap whose payload cannot be parsed at all is answered the same way
+   (never silently ignored).
+3. Tap «⬅️ Меню» on any picker always returns the main view. If the
+   picker's menu id no longer exists (bot restart in between), the tap is
+   answered as a stale tap (F9.1: outdated hint + main view) — the owner
+   still ends up on the main view, never stuck.
 
-**Acceptance Scenarios**:
+### F10 — Permission / question prompts (unchanged, inline)
 
-1. **Given** a running task, **When** the run starts, **Then** the
-   keyboard shows the run view (Стоп/Статус/Меню).
-2. **Given** the run view, **When** «⏹ Стоп» is tapped, **Then** the task
-   aborts with a confirmation and the main keyboard returns.
-3. **Given** a running task, **When** it completes normally, **Then** the
-   main keyboard returns together with the reply.
+1. While running, the agent may ask for a permission → inline row
+   [✅ Allow once, 🔁 Always, ⛔ Deny]; tap replies to OpenCode and the bot
+   confirms; the prompt message is removed.
+2. The agent may ask questions → one message per question showing BOTH
+   the short header and the full question text with option rows; taps step
+   through questions (each answered message is removed) and the last tap
+   submits all answers.
 
----
+## User Stories (mapped to flows)
 
-### Edge Cases
+- **US1 (P1)** Main menu replaces command typing → F0, F1, F7, F8.
+- **US2 (P1)** Session selection via keyboard → F3.
+- **US3 (P2)** Projects and models pickers → F4, F5.
+- **US4 (P2)** Run controls while the agent works → F0.3–F0.5, F6.
+- **US5 (P2)** New task with explicit project choice → F2.
 
-- What happens when a keyboard button from a stale view is tapped (e.g.
-  the sessions list changed or the bot restarted)? The tap is answered
-  with the main keyboard and a short hint; no crash, no wrong selection.
-- What happens when two session buttons share the same title? The view
-  stores session ids, so the tap resolves by id, not by title.
-- What happens when the agent finishes while the owner is inside another
-  menu? The reply arrives; the view switches to main only if the finished
-  run's view was active (menu browsing is not interrupted mid-lookup).
-- What happens when the projects/models lists have more than 10 entries?
-  Only the first 10 are offered; the rest remain reachable after
-  narrowing (full pagination is out of scope).
-
-## Requirements *(mandatory)*
-
-### Functional Requirements
+## Requirements (mandatory)
 
 - **FR-101**: System MUST present the persistent main command keyboard by
-  default (after start, restart, /help, /new, /status) with buttons:
-  Новая, Сессии, Статус, Проекты, Модели, Стоп, Помощь.
+  default (after start, restart, /help, /new, /status and every other
+  management reply) with buttons: Новая, Сессии, Статус, Проекты, Модели,
+  Стоп, Помощь.
 - **FR-102**: System MUST perform the same action for a keyboard button as
   for the corresponding typed command; typed `/commands` keep working.
-- **FR-103**: System MUST open a picker view (sessions/projects/models)
-  when its menu button is tapped, showing up to 10 option buttons plus
-  «⬅️ Меню».
+- **FR-103**: System MUST open a picker view (sessions/projects/models and
+  the new-task project choice) when its menu button is tapped, showing at
+  most 5 option buttons (platform-verified limit) plus a nav row: just
+  «⬅️ Меню» when everything fits, otherwise «◀️ / ⬅️ Меню / ▶️» with only
+  the available directions enabled (6 rows total). The picker message MUST
+  show the total option count, and the page indicator when paginating.
 - **FR-104**: System MUST resolve picker taps by stored option identity
   (session id / project id / provider+model), not by visible label.
 - **FR-105**: System MUST return to the main keyboard after a successful
   pick (resume/switch) with a confirmation message.
-- **FR-106**: System MUST switch to the run view (Стоп, Статус, Меню) when
-  a run starts and back to the main keyboard when it ends or is aborted.
-- **FR-107**: System MUST treat free text at any view as an agent prompt;
-  non-menu text resets the view to main.
-- **FR-108**: System MUST handle taps of stale/unknown options gracefully:
-  return to the main keyboard with a short hint (no silent ignore).
-- **FR-109**: System MUST keep all button labels and hints in Russian via
-  the i18n layer (no hardcoded strings).
+- **FR-106**: System MUST switch to the run view when a run starts and
+  back to the main keyboard when it ends, errors, or is aborted.
+- **FR-107**: System MUST treat free text at any view as an agent prompt.
+- **FR-108**: System MUST handle taps of stale/unknown/unparseable options
+  gracefully: return to the main keyboard with a short hint (no silent
+  ignore).
+- **FR-109**: System MUST keep all button hints and replies in Russian via
+  the i18n layer (button LABELS are fixed constants, see Interaction
+  Model).
 - **FR-110**: System MUST NOT send more than one keyboard replacement per
-  navigation action (no duplicate keyboard updates).
+  navigation action.
+- **FR-111**: System MUST accept `message_event` payloads in both shapes:
+  Long Poll object payloads and legacy JSON strings; button taps MUST
+  resolve against the peer carried by the event itself (so taps work
+  immediately after a bot restart).
+- **FR-112**: System MUST map every reply-keyboard label (including «🏠
+  Меню» and «⏹ Стоп») to its action; no label may ever be forwarded to the
+  agent as prompt text.
+- **FR-114**: While a run is active, bot-initiated messages (run-started
+  notice, live status line) MUST be sent silently (no notification). The
+  final reply and run-error messages are the run's completion signals and
+  MUST notify.
+- **FR-115**: While a run is active, the system MUST keep a live progress
+  line showing the current tool call (with compact context such as the
+  edited file) and the action count, refreshed at most once per 3 s, so
+  the owner can follow what the agent is doing and detect a stuck or
+  misguided run.
+- **FR-116**: One-shot menu messages (picker after pick/back, previous
+  picker page after paging, answered question, resolved permission
+  prompt) MUST be removed from the dialog, so consumed buttons cannot
+  linger looking tappable. Removal is best-effort (a failed delete never
+  breaks the flow).
 
-### Key Entities *(include if feature involves data)*
+## Key Entities
 
-- **KeyboardView**: current per-dialog view (main / sessions / projects /
-  models / run) with the stored options for the active picker; in-memory,
-  defaults to main after restart.
 - **PickerOption**: identity + label pairs captured when a picker is
   rendered; taps resolve against these, never against live lookups.
+  Stored in an in-memory LRU registry (32 entries) keyed by a short menu
+  id embedded in the button payload.
+- **KeyboardView**: informational per-dialog view name (main / sessions /
+  projects / models / run). The reply keyboard actually shown is a
+  property of the last message; the safe default after a restart is main.
 
-## Success Criteria *(mandatory)*
-
-### Measurable Outcomes
+## Success Criteria (mandatory)
 
 - **SC-101**: 100% of management actions (new, resume, status, projects,
   models, stop, help) are reachable in ≤2 taps without typing.
 - **SC-102**: Free-text prompting keeps working at any view (0 prompts
-  lost to the keyboard layer).
+  lost to the keyboard layer, 0 labels leaked as prompts).
 - **SC-103**: Picker taps resolve by identity: renaming a session between
   rendering and tapping still resumes the correct session id.
 - **SC-104**: A stale tap (bot restart between render and tap) returns the
-  owner to the main keyboard with a hint within 3 seconds.
+  owner to the main keyboard with a hint; «⬅️ Меню» always works.
 
 ## Assumptions
 
-- The dialog has exactly one keyboard at a time; every bot message may
-  carry a replacement keyboard.
+- The dialog has exactly one reply keyboard at a time; every bot message
+  may carry a replacement reply keyboard.
 - Reply keyboards are client-side state; after a bot restart the main view
   is the safe default.
-- More than 10 options: truncated to the first 10 (consistent with
-  previous menus); full pagination stays out of scope.
+- More than 5 options: paginated 5 per page via the inline nav row
+  (platform-verified inline row limit of 6). Sessions fetch is capped at
+  100 entries; deeper history stays out of scope.
+- Paged-away picker pages have their messages removed (FR-116); re-tapping
+  a nav button of an already-removed page message is impossible in the
+  client, so orphan duplicates do not accumulate in practice (a simulated
+  stale re-tap renders a fresh page — harmless).
 - Typed `/commands` remain fully functional (keyboard is an addition, not
   a replacement of the command layer).
+
+## Verification
+
+- `tests/vk/flows.e2e.test.ts` runs every flow F0–F9 against the real
+  composition (normalizer → router → commands → pickers → sender) with the
+  VK HTTPS API and the OpenCode SDK mocked at the transport boundary,
+  asserting the exact outbound `messages.send` calls (text + keyboard).
+  F10 (permission/question prompts) is covered by unit tests in
+  `tests/vk/menus.test.ts`.
+  Tests run under the default `en` locale (BOT_LOCALE unset); the Russian
+  message texts quoted in the flows live in `src/i18n/ru.ts` and the fixed
+  button labels are Russian constants (Interaction Model).
+- Live bring-up: `scripts/vk-live-probe.mjs` validates against the real VK
+  API that every keyboard (main, run, each picker) is accepted
+  (error 911/912 would reject), and a `VK_SELF_TEST` round-trip validates
+  the prompt loop end-to-end.

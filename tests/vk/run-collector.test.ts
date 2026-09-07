@@ -40,6 +40,7 @@ function sessionError(message: string, sessionId = SESSION) {
 async function createCollector() {
   const results: RunResult[] = [];
   const errors: Array<{ sessionId: string; message: string }> = [];
+  const activities: Array<{ toolCount: number; lastTool?: string; detail?: string }> = [];
   const collector = new VkRunCollector({
     onComplete: async (result) => {
       results.push(result);
@@ -47,8 +48,26 @@ async function createCollector() {
     onError: async (sessionId, message) => {
       errors.push({ sessionId, message });
     },
+    onActivity: async (activity) => {
+      activities.push(activity);
+    },
   });
-  return { collector, results, errors };
+  return { collector, results, errors, activities };
+}
+
+function toolPart(tool: string, input?: Record<string, unknown>, partId = "t1") {
+  return {
+    type: "message.part.updated",
+    properties: {
+      part: {
+        type: "tool",
+        id: partId,
+        tool,
+        sessionID: SESSION,
+        ...(input ? { state: { input } } : {}),
+      },
+    },
+  };
 }
 
 describe("vk run collector", () => {
@@ -124,6 +143,47 @@ describe("vk run collector", () => {
     expect(errors).toEqual([{ sessionId: SESSION, message: "model exploded" }]);
     expect(results).toHaveLength(0);
     expect(collector.isActive()).toBe(false);
+  });
+
+  it("reports tool activity with compact input context (FR-115)", async () => {
+    const { collector, activities } = await createCollector();
+    await collector.begin(SESSION, DIRECTORY);
+
+    collector.processEvent(toolPart("edit", { filePath: "/repo/src/index.ts" }, "t1"));
+    collector.processEvent(toolPart("bash", { command: "npm test" }, "t2"));
+    collector.processEvent(toolPart("glob", undefined, "t3"));
+
+    expect(activities.map((a) => a.lastTool)).toEqual(["edit", "bash", "glob"]);
+    expect(activities.map((a) => a.toolCount)).toEqual([1, 2, 3]);
+    expect(defined(activities[0]).detail).toBe("/repo/src/index.ts");
+    expect(defined(activities[1]).detail).toBe("npm test");
+    expect(activities[2]!.detail).toBeUndefined();
+  });
+
+  it("truncates long tool details to 60 chars including the ellipsis", async () => {
+    const { collector, activities } = await createCollector();
+    await collector.begin(SESSION, DIRECTORY);
+
+    collector.processEvent(
+      toolPart("edit", { filePath: "x".repeat(100) }, "t1"),
+    );
+
+    expect(defined(activities[0]).detail).toHaveLength(60);
+    expect(defined(activities[0]).detail!.endsWith("…")).toBe(true);
+  });
+
+  it("ignores tool parts of other sessions", async () => {
+    const { collector, activities } = await createCollector();
+    await collector.begin(SESSION, DIRECTORY);
+
+    collector.processEvent({
+      type: "message.part.updated",
+      properties: {
+        part: { type: "tool", id: "t1", tool: "edit", sessionID: "ses-other" },
+      },
+    });
+
+    expect(activities).toHaveLength(0);
   });
 
   it("drops everything after abort()", async () => {

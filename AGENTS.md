@@ -130,6 +130,22 @@ For multi-step tasks, state a brief plan:
 3. [Step] → verify: [check]
 ```
 
+### Reviewer Validation
+
+**Significant changes are validated by reviewer subagents before finishing.**
+
+Mandatory for: spec changes, multi-file features, navigation/UX flows, bug-fix
+batches. Optional only for single-line mechanical edits.
+
+- Launch at least one reviewer subagent (Task tool, `general` type) with a
+  review prompt; for flow-level changes use two: one reviews spec ↔ code
+  consistency, one reviews tests ↔ flows coverage.
+- The reviewer gets: the spec/flow document, the diff scope (files to read),
+  and explicit questions ("does every flow step have a code path and a
+  test?"). It must report PASS/FAIL with file:line evidence.
+- Fix every FAIL before reporting the task done; re-review after non-trivial
+  fixes.
+
 ### Git
 
 - **Commits:** Never create commits automatically. Commit only when the user explicitly asks.

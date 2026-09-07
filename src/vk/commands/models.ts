@@ -2,16 +2,15 @@ import { getProviderModels, getProviders } from "../../app/services/model-select
 import { logger } from "../../utils/logger.js";
 import { t } from "../../i18n/index.js";
 import type { VkSender } from "../send.js";
-import {
-  buildInlinePickerKeyboard,
-  isKeyboardWithinBudget,
-  registerPicker,
-  setView,
-  type PickerOption,
-} from "../keyboards.js";
+import type { PickerOption } from "../keyboards.js";
+import { sendPickerView } from "../picker.js";
 
-/** /models: open the models picker view (FR-009, US3). */
-export async function handleModelsCommand(sender: VkSender, peerId: number): Promise<void> {
+/** /models: open the models picker view (FR-103, US3, F5). */
+export async function handleModelsCommand(
+  sender: VkSender,
+  peerId: number,
+  page = 0,
+): Promise<void> {
   const providers = await getProviders();
   const options: PickerOption[] = [];
 
@@ -31,23 +30,10 @@ export async function handleModelsCommand(sender: VkSender, peerId: number): Pro
   }
 
   if (options.length === 0) {
-    await sender.sendText(peerId, t("vk.models_empty"));
+    await sender.sendText(peerId, t("vk.models_empty"), { mainKeyboard: true });
     return;
   }
 
   logger.info(`[VkBot] /models: ${options.length} model(s) listed`);
-  setView(peerId, "models", options);
-
-  const menuId = registerPicker("models", options);
-  const keyboard = buildInlinePickerKeyboard(menuId, options);
-  const textFallback =
-    t("vk.models_header") + "\n" + options.map((o, i) => `${i + 1}. ${o.label}`).join("\n");
-  if (isKeyboardWithinBudget(keyboard)) {
-    await sender.sendText(peerId, t("vk.models_header"), {
-      keyboard,
-      fallbackText: textFallback,
-    });
-  } else {
-    await sender.sendText(peerId, textFallback);
-  }
+  await sendPickerView(sender, peerId, "models", options, "vk.models_header", page);
 }

@@ -95,21 +95,19 @@ describe("runtime/bootstrap", () => {
       ENV_EXAMPLE_CONTENT,
     );
 
-    expect(updated).toContain("# Telegram Bot Token (from @BotFather)");
-    expect(updated).toContain("TELEGRAM_BOT_TOKEN=token:value");
-    expect(updated).toContain("TELEGRAM_ALLOWED_USER_ID=42");
-    expect(updated).toContain("# Telegram Proxy URL (optional)");
+    expect(updated).toContain("# Access token with");
+    expect(updated).toContain("VK_GROUP_TOKEN=");
     expect(updated).toContain("# OPENCODE_API_URL=http://localhost:4096");
     expect(updated).toContain("OPENCODE_SERVER_USERNAME=opencode");
     expect(updated).toContain("# OPENCODE_SERVER_PASSWORD=");
     expect(updated).toContain("BOT_LOCALE=ru");
 
-    expect(updated.indexOf("# Telegram Bot Token (from @BotFather)")).toBeLessThan(
-      updated.indexOf("TELEGRAM_BOT_TOKEN=token:value"),
+    expect(updated.indexOf("# Access token with")).toBeLessThan(
+      updated.indexOf("VK_GROUP_TOKEN="),
     );
-    expect(updated.indexOf("# Bot locale: supported locale code (default: en)")).toBeLessThan(
-      updated.indexOf("BOT_LOCALE=ru"),
-    );
+    expect(
+      updated.indexOf("# Supported locales: en, ru, ar, de, es, fr, it, ko, pt, zh"),
+    ).toBeLessThan(updated.indexOf("BOT_LOCALE=ru"));
   });
 
   it("preserves existing values for template keys outside the wizard", () => {
@@ -187,7 +185,7 @@ describe("runtime/bootstrap", () => {
     expect(updated).toContain("LOG_LEVEL=debug");
     expect(updated).toContain("CUSTOM_FLAG=enabled");
     expect(updated).toContain("ANOTHER_CUSTOM=1");
-    expect(updated.lastIndexOf("# TTS_VOICE=alloy")).toBeLessThan(
+    expect(updated.lastIndexOf("# STT_NOTE_PROMPT=")).toBeLessThan(
       updated.lastIndexOf("CUSTOM_FLAG=enabled"),
     );
     expect(updated.trimEnd().endsWith("ANOTHER_CUSTOM=1")).toBe(true);

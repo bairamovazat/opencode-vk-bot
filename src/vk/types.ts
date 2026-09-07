@@ -24,8 +24,8 @@ export interface VkMessageEventObject {
   user_id: number;
   peer_id: number;
   event_id: string;
-  /** JSON string per contracts/callback-payloads.md. */
-  payload?: string;
+  /** Long Poll delivers a parsed object; callback API delivers a JSON string. */
+  payload?: string | Record<string, unknown>;
   conversation_message_id?: number;
 }
 

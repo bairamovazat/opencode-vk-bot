@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 # 1. OpenCode backend (если ещё не запущен)
 if ! curl -s --max-time 3 http://localhost:4096/global/health > /dev/null; then
   echo "[start] Запускаю opencode serve..."
-  nohup "$HOME/.opencode/bin/opencode serve" > /tmp/opencode-serve.log 2>&1 &
+  nohup "$HOME/.opencode/bin/opencode" serve > /tmp/opencode-serve.log 2>&1 &
   sleep 4
 fi
 
